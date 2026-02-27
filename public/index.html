@@ -663,7 +663,7 @@
     // ─── WEBSOCKET ───
     function initWebSocket() {
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}`);
+        ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
         ws.onopen = () => {
             log('WebSocket connected to backend.', 'system');
