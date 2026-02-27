@@ -1,5 +1,5 @@
 import Fastify, { FastifyInstance } from "fastify";
-import fastifyWebsocket, { SocketStream } from "@fastify/websocket";
+import fastifyWebsocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -33,7 +33,7 @@ export async function createServer(): Promise<FastifyInstance> {
 
   server.get("/", { websocket: true }, (connection, req) => {
     let rcon: RconClient | null = null;
-    const { socket } = connection as unknown as SocketStream;
+    const { socket } = connection as any;
 
     server.log.info("[WS] New client connected");
 
