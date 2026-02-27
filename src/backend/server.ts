@@ -39,7 +39,7 @@ export async function createServer(): Promise<FastifyInstance> {
 
     server.log.info("[WS] New client connected");
 
-    socket.on("message", async (raw: import("ws").RawData) => {
+    socket.on("message", async (raw: any) => {
       let msg: any;
       try {
         msg = JSON.parse(raw.toString());
