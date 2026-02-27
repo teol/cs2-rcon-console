@@ -131,7 +131,10 @@ export class RconClient extends EventEmitter {
         }
       });
 
-      this.socket.on("data", (data) => this.handleData(data));
+      // Cast data to Buffer explicitly
+      this.socket.on("data", (data: any) =>
+        this.handleData(Buffer.isBuffer(data) ? data : Buffer.from(data)),
+      );
 
       this.socket.on("error", (err) => {
         clearTimeout(connectTimeout);
