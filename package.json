@@ -2,7 +2,9 @@
   "name": "cs2-web-rcon",
   "private": true,
   "packageManager": "yarn@4.12.0",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "yarn workspaces foreach -At run build",
     "dev": "yarn workspaces foreach -Api run dev",

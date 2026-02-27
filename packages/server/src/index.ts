@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyWebSocket from "@fastify/websocket";
-import { RconClient } from "./rcon.js";
+import { RconClient } from "@cs2-rcon/rcon";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -32,8 +32,10 @@ export function send(ws: { send: (data: string) => void }, msg: ServerMessage): 
 export async function buildApp() {
   const app = Fastify({ logger: false });
 
+  // Serve the Vite-built renderer output
+  const rendererDist = path.resolve(__dirname, "..", "..", "renderer", "dist");
   await app.register(fastifyStatic, {
-    root: path.join(__dirname, "..", "public"),
+    root: rendererDist,
   });
 
   await app.register(fastifyWebSocket);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import net from "node:net";
-import { RconClient, PacketType } from "./rcon.js";
+import { RconClient, PacketType } from "./index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
