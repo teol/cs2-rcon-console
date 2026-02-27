@@ -114,9 +114,8 @@ export class RconClient extends EventEmitter {
       const { id, packet } = this.encodePacket(PacketType.AUTH, password);
 
       const timer = setTimeout(() => {
-        this.pendingRequests.delete(id);
-        reject(new Error("Authentication timed out"));
-      }, 5_000);
+        reject(new Error(`Authentication timed out`));
+
 
       this.pendingRequests.set(id, {
         resolve: (val) => {
