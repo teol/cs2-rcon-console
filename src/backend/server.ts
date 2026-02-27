@@ -35,7 +35,8 @@ export async function createServer(): Promise<FastifyInstance> {
     let rcon: RconClient | null = null;
     // Cast connection to any to bypass missing type definition for SocketStream in this context
     // The @fastify/websocket types seem to be tricky with how they export SocketStream or how it's augmented.
-    const socket = (connection as any).socket;
+    // @ts-ignore
+    const socket = connection.socket;
 
     server.log.info("[WS] New client connected");
 

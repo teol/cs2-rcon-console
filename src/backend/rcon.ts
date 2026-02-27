@@ -165,11 +165,10 @@ export class RconClient extends EventEmitter {
   /**
    * Handle incoming TCP data (may contain multiple or partial packets)
    */
-  private handleData(data: Buffer): void {
+  private handleData(data: unknown): void {
     // Ensure data is treated as Uint8Array/Buffer for concat.
     // We cast to any first to avoid type mismatch with Buffer concat signature in strict mode.
-    // In runtime, 'data' is a Buffer so this is safe.
-    const chunk = data as any;
+    const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data as any);
     this.responseBuffer = Buffer.concat([this.responseBuffer, chunk]);
 
     let packet;
