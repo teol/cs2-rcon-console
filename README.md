@@ -1,81 +1,92 @@
 # CS2 Web RCON Console
 
-A web-based RCON console for Counter-Strike 2 servers, inspired by [rcon.srcds.pro](https://rcon.srcds.pro/).
-
-## Architecture
-
-```
-┌─────────────┐     WebSocket     ┌──────────────┐     TCP (RCON)     ┌─────────────┐
-│   Browser    │ ◄──────────────► │   Node.js    │ ◄───────────────► │  CS2 Server │
-│  (Frontend)  │                  │  (Backend)   │                    │    :27015   │
-└─────────────┘                   └──────────────┘                    └─────────────┘
-```
-
-- **Frontend**: Web interface with interactive console, quick commands, server history
-- **Backend**: Express + WebSocket server acting as a TCP proxy
-- **RCON**: Pure implementation of the Source RCON protocol (binary TCP packets)
-
-Browsers cannot open raw TCP connections. The Node.js backend bridges the browser's WebSocket to the game server's TCP RCON port.
-
-## Setup
-
-```bash
-npm install
-npm start
-```
-
-Open http://localhost:3000
-
-For development with auto-reload:
-
-```bash
-npm run dev
-```
+A modern, web-based RCON console for Counter-Strike 2 servers.
 
 ## Features
 
-- Connect to any CS2 server via RCON
-- Interactive console with command history (↑/↓ arrow keys)
-- Quick commands (match control, map changes, cvars)
-- Server history persisted in localStorage
-- Responsive UI
-- Automatic WebSocket reconnection
+- **Connect** to any CS2 server via RCON (TCP)
+- **Interactive Console** with command history
+- **Quick Commands** for common match/server actions
+- **Server History** persisted in local storage
+- **Responsive UI** built with React + Vite
+- **WebSocket** communication via Fastify backend
 
-## Project Structure
+## Prerequisites
 
+- Node.js (v18+)
+- Yarn 4 (Corepack enabled)
+
+## Installation
+
+1. Clone the repository:
+
+   ```bash
+   git clone <repo-url>
+   cd cs2-web-rcon
+   ```
+
+2. Enable Corepack and install dependencies:
+   ```bash
+   corepack enable
+   yarn install
+   ```
+
+## Development
+
+Run the development server (frontend + backend concurrently):
+
+```bash
+yarn dev
 ```
-├── server.js          # Express + WebSocket server
-├── rcon.js            # RCON client (Source RCON TCP protocol)
-├── package.json
-├── public/
-│   └── index.html     # Full frontend (HTML/CSS/JS)
-└── README.md
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3000
+
+The Vite dev server proxies WebSocket connections (`/ws`) to the backend.
+
+## Production Build
+
+1. Build the frontend:
+
+   ```bash
+   yarn build
+   ```
+
+   This generates the static files in the `dist/` directory.
+
+2. Start the production server:
+   ```bash
+   yarn start
+   ```
+   The backend will serve the static files from `dist/` and handle WebSocket connections on port 3000 (default).
+
+## Deployment (Nginx)
+
+To run in production behind Nginx, use the following configuration as a starting point:
+
+```nginx
+server {
+    listen 80;
+    server_name rcon.example.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+}
 ```
 
-## RCON Protocol
+Ensure `yarn start` is running (e.g., via PM2 or Systemd).
 
-The Source RCON protocol uses TCP packets with the following structure:
+## Environment Variables
 
-| Field   | Size     | Description                              |
-|---------|----------|------------------------------------------|
-| Size    | 4 bytes  | Packet size (excluding this field)       |
-| ID      | 4 bytes  | Request ID                               |
-| Type    | 4 bytes  | 3 = Auth, 2 = Command, 0 = Response     |
-| Body    | Variable | Command or response (null-terminated ASCII) |
-| Padding | 1 byte   | Empty string terminator                  |
+| Variable | Default | Description                     |
+| -------- | ------- | ------------------------------- |
+| `PORT`   | 3000    | The port for the backend server |
 
-Reference: https://developer.valvesoftware.com/wiki/Source_RCON_Protocol
+## License
 
-## Configuration
-
-| Environment Variable | Default | Description      |
-|----------------------|---------|------------------|
-| `PORT`               | 3000    | Web server port  |
-
-## Security
-
-⚠️ This project is intended for local network or personal use. If you expose it to the internet, consider:
-
-- Adding authentication (HTTP Basic, JWT, etc.)
-- Using HTTPS via a reverse proxy (nginx, Caddy)
-- Rate limiting RCON connections
+MIT

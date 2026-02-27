@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Lint (Prettier)
+        run: yarn lint
+
+      - name: Type Check
+        run: yarn typecheck
+
+      - name: Run Tests
+        run: yarn test
+
+      - name: Build Frontend
+        run: yarn build

@@ -1,0 +1,8 @@
+[1] Server listening at http://localhost:3000
+[1] {"level":30,"time":1772156044376,"pid":7019,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3000"}
+[1] {"level":30,"time":1772156044377,"pid":7019,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3000"}
+[0]
+[0]   VITE v7.3.1  ready in 1843 ms
+[0]
+[0]   ➜  Local:   http://localhost:5173/
+[0]   ➜  Network: use --host to expose
