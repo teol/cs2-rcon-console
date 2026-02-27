@@ -37,11 +37,11 @@ export async function createServer(): Promise<FastifyInstance> {
 
   server.get("/", { websocket: true }, (connection, req) => {
     let rcon: RconClient | null = null;
-    const { socket } = connection;
+    const { socket } = connection as import("@fastify/websocket").SocketStream;
 
     server.log.info("[WS] New client connected");
 
-    socket.on("message", async (raw) => {
+    socket.on("message", async (raw: import("ws").RawData) => {
       let msg: any;
       try {
         msg = JSON.parse(raw.toString());

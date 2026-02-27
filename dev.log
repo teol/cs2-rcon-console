@@ -6,3 +6,11 @@
 [0]
 [0]   ➜  Local:   http://localhost:5173/
 [0]   ➜  Network: use --host to expose
+[1] 1:41:14 AM [tsx] change in ./src/backend/rcon.ts Restarting...
+[1] c{"level":30,"time":1772156475825,"pid":11547,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3000"}
+[1] Server listening at http://localhost:3000
+[1] {"level":30,"time":1772156475825,"pid":11547,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3000"}
+[1] 1:41:19 AM [tsx] change in ./src/backend/server.ts Restarting...
+[1] c{"level":30,"time":1772156480325,"pid":11581,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3000"}
+[1] Server listening at http://localhost:3000
+[1] {"level":30,"time":1772156480325,"pid":11581,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3000"}

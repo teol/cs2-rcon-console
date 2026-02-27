@@ -162,7 +162,13 @@ export class RconClient extends EventEmitter {
    * Handle incoming TCP data (may contain multiple or partial packets)
    */
   private handleData(data: Buffer): void {
-    this.responseBuffer = Buffer.concat([this.responseBuffer, data]);
+    // Ensure data is treated as Uint8Array/Buffer for concat.
+    // data from net.Socket is Buffer by default if setEncoding is not called, but types might be loose.
+    const chunks: Uint8Array[] = [
+      this.responseBuffer,
+      data as unknown as Uint8Array,
+    ];
+    this.responseBuffer = Buffer.concat(chunks);
 
     let packet;
     while ((packet = this.decodePacket(this.responseBuffer)) !== null) {
