@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
 /** JSON messages sent from the browser to the server. */
-interface ClientMessage {
+export interface ClientMessage {
   type: "connect" | "command" | "disconnect";
   host?: string;
   port?: string;
@@ -18,17 +18,18 @@ interface ClientMessage {
 }
 
 /** JSON messages sent from the server to the browser. */
-type ServerMessage =
+export type ServerMessage =
   | { type: "connected"; message: string }
   | { type: "disconnected" }
   | { type: "response"; command: string; body: string }
   | { type: "error"; message: string };
 
-function send(ws: { send: (data: string) => void }, msg: ServerMessage): void {
+export function send(ws: { send: (data: string) => void }, msg: ServerMessage): void {
   ws.send(JSON.stringify(msg));
 }
 
-async function main(): Promise<void> {
+/** Create and configure the Fastify app (without starting it). */
+export async function buildApp() {
   const app = Fastify({ logger: false });
 
   await app.register(fastifyStatic, {
@@ -85,7 +86,6 @@ async function main(): Promise<void> {
             console.log(`[RCON] Connected to ${host}:${port}`);
           } catch (err) {
             send(socket, {
-              type: "error",
               type: "error",
               message: `Connection failed: ${(err as Error).message}`,
             });
@@ -154,11 +154,22 @@ async function main(): Promise<void> {
     });
   });
 
+  return app;
+}
+
+async function main(): Promise<void> {
+  const app = await buildApp();
   await app.listen({ port: PORT, host: "0.0.0.0" });
   console.log(`CS2 Web RCON running on http://localhost:${PORT}`);
 }
 
-main().catch((err) => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
-});
+// Only auto-start when this file is the entry point (not when imported by tests).
+const isMain =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isMain) {
+  main().catch((err) => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  });
+}
