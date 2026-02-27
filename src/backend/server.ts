@@ -20,10 +20,6 @@ export async function createServer(): Promise<FastifyInstance> {
   await server.register(fastifyWebsocket);
 
   // Serve static files (production build of frontend)
-  // In development, we might not have 'dist' yet, so we can wrap in try/catch or just let it fail if needed
-  // For the sake of this refactor, we assume 'dist' will exist in prod.
-  // In dev, Vite handles the frontend.
-  // We can check if we are in production mode or if dist exists.
   try {
     await server.register(fastifyStatic, {
       root: path.resolve(__dirname, "../../dist"),
@@ -37,7 +33,9 @@ export async function createServer(): Promise<FastifyInstance> {
 
   server.get("/", { websocket: true }, (connection, req) => {
     let rcon: RconClient | null = null;
-    const { socket } = connection as import("@fastify/websocket").SocketStream;
+    // Cast connection to any to bypass missing type definition for SocketStream in this context
+    // The @fastify/websocket types seem to be tricky with how they export SocketStream or how it's augmented.
+    const socket = (connection as any).socket;
 
     server.log.info("[WS] New client connected");
 
@@ -64,7 +62,6 @@ export async function createServer(): Promise<FastifyInstance> {
             );
           }
 
-          // Disconnect previous connection if any
           if (rcon) {
             rcon.disconnect();
           }
@@ -182,7 +179,6 @@ export async function createServer(): Promise<FastifyInstance> {
   return server;
 }
 
-// Start server if main module
 if (import.meta.url === `file://${process.argv[1]}`) {
   const server = await createServer();
   try {

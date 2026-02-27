@@ -163,12 +163,10 @@ export class RconClient extends EventEmitter {
    */
   private handleData(data: Buffer): void {
     // Ensure data is treated as Uint8Array/Buffer for concat.
-    // data from net.Socket is Buffer by default if setEncoding is not called, but types might be loose.
-    const chunks: Uint8Array[] = [
-      this.responseBuffer,
-      data as unknown as Uint8Array,
-    ];
-    this.responseBuffer = Buffer.concat(chunks);
+    // We cast to any first to avoid type mismatch with Buffer concat signature in strict mode.
+    // In runtime, 'data' is a Buffer so this is safe.
+    const chunk = data as any;
+    this.responseBuffer = Buffer.concat([this.responseBuffer, chunk]);
 
     let packet;
     while ((packet = this.decodePacket(this.responseBuffer)) !== null) {
