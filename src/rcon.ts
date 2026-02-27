@@ -89,17 +89,27 @@ export class RconClient extends EventEmitter {
 
   /** Route a decoded packet to the matching pending request. */
   private handlePacket(packet: RconPacket): void {
+    // Auth failure: the server responds with id = -1, but the pending request
+    // was stored under the real request id.  Reject the most recent pending
+    // auth request when we see a -1 AUTH_RESPONSE.
+    if (packet.type === PacketType.AUTH_RESPONSE && packet.id === -1) {
+      const entry = this.pendingRequests.entries().next();
+      if (!entry.done) {
+        const [key, pending] = entry.value;
+        this.pendingRequests.delete(key);
+        pending.reject(new Error("Authentication failed: wrong RCON password"));
+      }
+      this.emit("response", packet);
+      return;
+    }
+
     const pending = this.pendingRequests.get(packet.id);
     if (pending) {
       this.pendingRequests.delete(packet.id);
 
       if (packet.type === PacketType.AUTH_RESPONSE) {
-        if (packet.id === -1) {
-          pending.reject(new Error("Authentication failed: wrong RCON password"));
-        } else {
-          this.authenticated = true;
-          pending.resolve(true);
-        }
+        this.authenticated = true;
+        pending.resolve(true);
       } else {
         pending.resolve(packet.body);
       }
@@ -115,7 +125,7 @@ export class RconClient extends EventEmitter {
 
       const timer = setTimeout(() => {
         reject(new Error(`Authentication timed out`));
-
+      }, 5_000);
 
       this.pendingRequests.set(id, {
         resolve: (val) => {

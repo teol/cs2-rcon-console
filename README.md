@@ -51,7 +51,7 @@ yarn dev
 ## Configuration
 
 | Environment variable | Default | Description     |
-|----------------------|---------|-----------------|
+| -------------------- | ------- | --------------- |
 | `PORT`               | `3000`  | Web server port |
 
 ## Project structure
@@ -159,13 +159,13 @@ sudo certbot --nginx -d rcon.example.com
 
 The Source RCON protocol uses TCP packets with the following structure:
 
-| Field   | Size     | Description                                   |
-|---------|----------|-----------------------------------------------|
-| Size    | 4 bytes  | Packet size (excluding this field)             |
-| ID      | 4 bytes  | Request ID                                     |
-| Type    | 4 bytes  | 3 = Auth, 2 = Command, 0 = Response           |
-| Body    | Variable | Command or response (null-terminated ASCII)    |
-| Padding | 1 byte   | Empty string terminator                        |
+| Field   | Size     | Description                                 |
+| ------- | -------- | ------------------------------------------- |
+| Size    | 4 bytes  | Packet size (excluding this field)          |
+| ID      | 4 bytes  | Request ID                                  |
+| Type    | 4 bytes  | 3 = Auth, 2 = Command, 0 = Response         |
+| Body    | Variable | Command or response (null-terminated ASCII) |
+| Padding | 1 byte   | Empty string terminator                     |
 
 Reference: <https://developer.valvesoftware.com/wiki/Source_RCON_Protocol>
 
