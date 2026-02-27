@@ -16,7 +16,6 @@ interface HistoryEntry {
 }
 
 const HISTORY_KEY = "rcon_history";
-let lineId = 0;
 
 function loadHistory(): HistoryEntry[] {
   try {
@@ -31,10 +30,11 @@ function persistHistory(history: HistoryEntry[]) {
 }
 
 export function useRcon() {
+  const lineId = useRef(0);
   const [connected, setConnected] = useState(false);
   const [lines, setLines] = useState<ConsoleLine[]>([
-    { id: lineId++, text: "CS2 Web RCON Console v2.0.0", type: "system" },
-    { id: lineId++, text: "Enter server details and connect to begin.", type: "system" },
+    { id: lineId.current++, text: "CS2 Web RCON Console v2.0.0", type: "system" },
+    { id: lineId.current++, text: "Enter server details and connect to begin.", type: "system" },
   ]);
   const [serverHistory, setServerHistory] = useState<HistoryEntry[]>(loadHistory);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -43,11 +43,11 @@ export function useRcon() {
   const connectedRef = useRef(false);
 
   const log = useCallback((text: string, type: LineType = "system") => {
-    setLines((prev) => [...prev, { id: lineId++, text, type }]);
+    setLines((prev) => [...prev, { id: lineId.current++, text, type }]);
   }, []);
 
   const clearConsole = useCallback(() => {
-    setLines([{ id: lineId++, text: "Console cleared.", type: "system" }]);
+    setLines([{ id: lineId.current++, text: "Console cleared.", type: "system" }]);
   }, []);
 
   // Keep connectedRef in sync
@@ -66,25 +66,30 @@ export function useRcon() {
       };
 
       ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        switch (msg.type) {
-          case "connected":
-            setConnected(true);
-            log(msg.message, "info");
-            break;
-          case "disconnected":
-            setConnected(false);
-            log("Disconnected from server.", "info");
-            break;
-          case "response":
-            log(msg.command, "cmd");
-            if (msg.body && msg.body.trim()) {
-              log(msg.body, "response");
-            }
-            break;
-          case "error":
-            log(msg.message, "error");
-            break;
+        try {
+          const msg = JSON.parse(event.data);
+          switch (msg.type) {
+            case "connected":
+              setConnected(true);
+              log(msg.message, "info");
+              break;
+            case "disconnected":
+              setConnected(false);
+              log("Disconnected from server.", "info");
+              break;
+            case "response":
+              log(msg.command, "cmd");
+              if (msg.body && msg.body.trim()) {
+                log(msg.body, "response");
+              }
+              break;
+            case "error":
+              log(msg.message, "error");
+              break;
+          }
+        } catch (err) {
+          console.error("Failed to parse WebSocket message:", err);
+          log("Received malformed message from server.", "error");
         }
       };
 
@@ -106,8 +111,7 @@ export function useRcon() {
     return () => {
       wsRef.current?.close();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [log]);
 
   const connectToServer = useCallback(
     (host: string, port: string, password: string) => {
