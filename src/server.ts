@@ -86,6 +86,7 @@ async function main(): Promise<void> {
           } catch (err) {
             send(socket, {
               type: "error",
+              type: "error",
               message: `Connection failed: ${(err as Error).message}`,
             });
             rcon = null;
