@@ -1145,6 +1145,15 @@ input:focus {
   background: rgba(248, 113, 113, 0.1);
 }
 
+.ban-duration-btn.btn-perm {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.ban-duration-btn.btn-perm.active {
+  background: rgba(248, 113, 113, 0.2);
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import type { PlayerInfo } from "../useRcon.ts";
 
+const BAN_DURATION_OPTIONS = [
+  { value: "5", label: "5m" },
+  { value: "15", label: "15m" },
+  { value: "30", label: "30m" },
+  { value: "60", label: "1h" },
+  { value: "1440", label: "24h" },
+  { value: "0", label: "Perm" },
+];
+
 interface PlayerTableProps {
   players: PlayerInfo[];
   maxPlayers: number;
@@ -39,9 +48,13 @@ export function PlayerTable({ players, maxPlayers, connected, onCommand }: Playe
 
   function handleBanConfirm() {
     if (!dialog) return;
-    const minutes = parseInt(banMinutes, 10) || 30;
+    let minutes = parseInt(banMinutes, 10);
+    if (isNaN(minutes) || minutes < 0) {
+      minutes = 30;
+    }
     onCommand(`banid ${minutes} ${dialog.player.steamId}`);
-    onCommand(`kickid ${dialog.player.userid} "Banned for ${minutes} minutes"`);
+    const durationText = minutes === 0 ? "permanently" : `for ${minutes} minutes`;
+    onCommand(`kickid ${dialog.player.userid} "Banned ${durationText}"`);
     setDialog(null);
   }
 
@@ -162,13 +175,13 @@ export function PlayerTable({ players, maxPlayers, connected, onCommand }: Playe
                 <div className="dialog-field">
                   <label>Duration (minutes)</label>
                   <div className="ban-duration-options">
-                    {["5", "15", "30", "60", "1440"].map((val) => (
+                    {BAN_DURATION_OPTIONS.map(({ value, label }) => (
                       <button
-                        key={val}
-                        className={`ban-duration-btn${banMinutes === val ? " active" : ""}`}
-                        onClick={() => setBanMinutes(val)}
+                        key={value}
+                        className={`ban-duration-btn${banMinutes === value ? " active" : ""}${value === "0" ? " btn-perm" : ""}`}
+                        onClick={() => setBanMinutes(value)}
                       >
-                        {val === "1440" ? "24h" : `${val}m`}
+                        {label}
                       </button>
                     ))}
                   </div>

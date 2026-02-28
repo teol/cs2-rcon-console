@@ -6,6 +6,7 @@ import fastifyWebSocket from "@fastify/websocket";
 import { RconClient } from "@cs2-rcon/rcon";
 import { parseStatus, parseStats } from "./parsers.js";
 import type { ServerInfo, PlayerInfo } from "./parsers.js";
+import { queryA2SInfo } from "./a2s.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -46,6 +47,8 @@ export async function buildApp() {
 
   app.get("/ws", { websocket: true }, (socket) => {
     let rcon: RconClient | null = null;
+    let rconHost: string | null = null;
+    let rconPort: number | null = null;
 
     console.log("[WS] New client connected");
 
@@ -85,6 +88,8 @@ export async function buildApp() {
 
           try {
             await rcon.connect(host, parseInt(port, 10), password);
+            rconHost = host;
+            rconPort = parseInt(port, 10);
             send(socket, {
               type: "connected",
               message: `Connected to ${host}:${port}`,
@@ -152,17 +157,46 @@ export async function buildApp() {
           }
 
           try {
-            const [statusResponse, statsResponse] = await Promise.all([
+            // Run A2S_INFO (UDP), RCON status (for player list), and
+            // RCON stats (for FPS/CPU) in parallel.  A2S provides more
+            // reliable static info; if it fails we fall back to RCON.
+            const [a2sResult, statusResponse, statsResponse] = await Promise.allSettled([
+              rconHost ? queryA2SInfo(rconHost, rconPort!, 3000) : Promise.reject("no host"),
               rcon.execute("status"),
               rcon.execute("stats"),
             ]);
 
-            const { server, players } = parseStatus(statusResponse || "");
-            const { fps, cpu } = parseStats(statsResponse || "");
+            // Player list always comes from RCON status
+            const statusValue = statusResponse.status === "fulfilled" ? statusResponse.value : "";
+            const { server: rconServer, players } = parseStatus(statusValue || "");
+
+            // FPS / CPU from RCON stats
+            const statsValue = statsResponse.status === "fulfilled" ? statsResponse.value : "";
+            const { fps, cpu } = parseStats(statsValue || "");
+
+            // Prefer A2S for static server info, fall back to RCON status
+            let serverInfo: Partial<ServerInfo>;
+            if (a2sResult.status === "fulfilled") {
+              const a2s = a2sResult.value;
+              serverInfo = {
+                hostname: a2s.hostname,
+                map: a2s.map,
+                players: a2s.players,
+                maxPlayers: a2s.maxPlayers,
+                bots: a2s.bots,
+                version: a2s.version,
+                type: `${a2s.serverType === "d" ? "dedicated" : a2s.serverType === "l" ? "listen" : "proxy"} (${a2s.environment === "l" ? "Linux" : a2s.environment === "w" ? "Windows" : "Mac"})`,
+                secure: a2s.vac,
+                fps,
+                cpu,
+              };
+            } else {
+              serverInfo = { ...rconServer, fps, cpu };
+            }
 
             send(socket, {
               type: "server_status",
-              server: { ...server, fps, cpu },
+              server: serverInfo,
             });
 
             send(socket, {

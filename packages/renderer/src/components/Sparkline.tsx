@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 interface SparklineProps {
   data: number[];
   width?: number;
@@ -13,6 +15,8 @@ export function Sparkline({
   color = "var(--accent)",
   label,
 }: SparklineProps) {
+  const gradientId = useId();
+
   if (data.length < 2) {
     return (
       <div className="sparkline-container">
@@ -60,12 +64,12 @@ export function Sparkline({
       {label && <span className="sparkline-label">{label}</span>}
       <svg width={width} height={height} className="sparkline-svg">
         <defs>
-          <linearGradient id={`grad-${label}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`grad-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity={0.3} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <path d={areaPath} fill={`url(#grad-${label})`} />
+        <path d={areaPath} fill={`url(#grad-${gradientId})`} />
         <polyline
           points={polyline}
           fill="none"

@@ -63,7 +63,7 @@ export function parseStatus(raw: string): {
     if (versionMatch) {
       const ver = versionMatch[1].trim();
       server.version = ver.split(/[\s/]/)[0];
-      server.secure = /secure/i.test(ver);
+      server.secure = /\bsecure\b/i.test(ver) && !/\binsecure\b/i.test(ver);
       continue;
     }
 
