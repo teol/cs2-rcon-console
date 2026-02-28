@@ -17,6 +17,10 @@ interface HistoryEntry {
 
 const HISTORY_KEY = "rcon_history";
 
+// Inactivity timeout: 15 minutes total, warning shown 60 seconds before
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+const WARNING_BEFORE_MS = 60 * 1000;
+
 function loadHistory(): HistoryEntry[] {
   try {
     return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
@@ -38,9 +42,14 @@ export function useRcon() {
   ]);
   const [serverHistory, setServerHistory] = useState<HistoryEntry[]>(loadHistory);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [inactivityWarning, setInactivityWarning] = useState(false);
+  const [inactivitySecondsLeft, setInactivitySecondsLeft] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const log = useCallback((text: string, type: LineType = "system") => {
     setLines((prev) => [...prev, { id: lineId.current++, text, type }]);
@@ -54,6 +63,94 @@ export function useRcon() {
   useEffect(() => {
     connectedRef.current = connected;
   }, [connected]);
+
+  const clearInactivityTimers = useCallback(() => {
+    if (warningTimerRef.current !== null) {
+      clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+    if (logoutTimerRef.current !== null) {
+      clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current !== null) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setInactivityWarning(false);
+  }, []);
+
+  const startInactivityTimers = useCallback(
+    (logFn: (text: string, type: LineType) => void) => {
+      clearInactivityTimers();
+
+      const warningDelay = INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS;
+
+      warningTimerRef.current = setTimeout(() => {
+        setInactivityWarning(true);
+        setInactivitySecondsLeft(WARNING_BEFORE_MS / 1000);
+
+        countdownIntervalRef.current = setInterval(() => {
+          setInactivitySecondsLeft((prev) => {
+            if (prev <= 1) return 0;
+            return prev - 1;
+          });
+        }, 1000);
+
+        logoutTimerRef.current = setTimeout(() => {
+          if (connectedRef.current) {
+            wsRef.current?.send(JSON.stringify({ type: "disconnect" }));
+            logFn("Session auto-disconnected due to inactivity.", "info");
+            clearInactivityTimers();
+          }
+        }, WARNING_BEFORE_MS);
+      }, warningDelay);
+    },
+    [clearInactivityTimers],
+  );
+
+  const resetInactivity = useCallback(() => {
+    if (connectedRef.current) {
+      startInactivityTimers(log);
+    }
+  }, [startInactivityTimers, log]);
+
+  // Start/stop inactivity timers based on connection state
+  useEffect(() => {
+    if (connected) {
+      startInactivityTimers(log);
+    } else {
+      clearInactivityTimers();
+    }
+    // clearInactivityTimers is stable; startInactivityTimers is stable.
+    // log is stable. connected is the only varying dep.
+  }, [connected, startInactivityTimers, clearInactivityTimers, log]);
+
+  // Reset inactivity timer on any global user interaction while connected
+  useEffect(() => {
+    if (!connected) return;
+
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function handleActivity() {
+      if (throttleTimer !== null) return;
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        resetInactivity();
+      }, 500);
+    }
+
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("click", handleActivity);
+
+    return () => {
+      if (throttleTimer !== null) clearTimeout(throttleTimer);
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("click", handleActivity);
+    };
+  }, [connected, resetInactivity]);
 
   // WebSocket connection with exponential backoff
   useEffect(() => {
@@ -160,8 +257,9 @@ export function useRcon() {
         if (next.length > 50) next.pop();
         return next;
       });
+      resetInactivity();
     },
-    [log],
+    [log, resetInactivity],
   );
 
   const removeFromHistory = useCallback((key: string) => {
@@ -177,11 +275,14 @@ export function useRcon() {
     lines,
     serverHistory,
     commandHistory,
+    inactivityWarning,
+    inactivitySecondsLeft,
     log,
     clearConsole,
     connectToServer,
     disconnect,
     sendCommand,
     removeFromHistory,
+    resetInactivity,
   };
 }
