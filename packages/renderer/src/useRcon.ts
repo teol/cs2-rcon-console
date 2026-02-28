@@ -80,51 +80,48 @@ export function useRcon() {
     setInactivityWarning(false);
   }, []);
 
-  const startInactivityTimers = useCallback(
-    (logFn: (text: string, type: LineType) => void) => {
-      clearInactivityTimers();
+  const startInactivityTimers = useCallback(() => {
+    clearInactivityTimers();
 
-      const warningDelay = INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS;
+    const warningDelay = INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS;
 
-      warningTimerRef.current = setTimeout(() => {
-        setInactivityWarning(true);
-        setInactivitySecondsLeft(WARNING_BEFORE_MS / 1000);
+    warningTimerRef.current = setTimeout(() => {
+      setInactivityWarning(true);
+      setInactivitySecondsLeft(WARNING_BEFORE_MS / 1000);
 
-        countdownIntervalRef.current = setInterval(() => {
-          setInactivitySecondsLeft((prev) => {
-            if (prev <= 1) return 0;
-            return prev - 1;
-          });
-        }, 1000);
+      countdownIntervalRef.current = setInterval(() => {
+        setInactivitySecondsLeft((prev) => {
+          if (prev <= 1) return 0;
+          return prev - 1;
+        });
+      }, 1000);
 
-        logoutTimerRef.current = setTimeout(() => {
-          if (connectedRef.current) {
-            wsRef.current?.send(JSON.stringify({ type: "disconnect" }));
-            logFn("Session auto-disconnected due to inactivity.", "info");
-            clearInactivityTimers();
-          }
-        }, WARNING_BEFORE_MS);
-      }, warningDelay);
-    },
-    [clearInactivityTimers],
-  );
+      logoutTimerRef.current = setTimeout(() => {
+        if (connectedRef.current) {
+          wsRef.current?.send(JSON.stringify({ type: "disconnect" }));
+          log("Session auto-disconnected due to inactivity.", "info");
+          clearInactivityTimers();
+        }
+      }, WARNING_BEFORE_MS);
+    }, warningDelay);
+  }, [clearInactivityTimers, log]);
 
   const resetInactivity = useCallback(() => {
     if (connectedRef.current) {
-      startInactivityTimers(log);
+      startInactivityTimers();
     }
-  }, [startInactivityTimers, log]);
+  }, [startInactivityTimers]);
 
   // Start/stop inactivity timers based on connection state
   useEffect(() => {
     if (connected) {
-      startInactivityTimers(log);
+      startInactivityTimers();
     } else {
       clearInactivityTimers();
     }
-    // clearInactivityTimers is stable; startInactivityTimers is stable.
-    // log is stable. connected is the only varying dep.
-  }, [connected, startInactivityTimers, clearInactivityTimers, log]);
+    // clearInactivityTimers and startInactivityTimers are stable.
+    // connected is the only varying dep.
+  }, [connected, startInactivityTimers, clearInactivityTimers]);
 
   // Reset inactivity timer on any global user interaction while connected
   useEffect(() => {
