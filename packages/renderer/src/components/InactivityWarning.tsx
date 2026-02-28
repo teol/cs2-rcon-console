@@ -4,7 +4,11 @@ interface InactivityWarningProps {
   onDisconnect: () => void;
 }
 
-export function InactivityWarning({ secondsLeft, onStayConnected, onDisconnect }: InactivityWarningProps) {
+export function InactivityWarning({
+  secondsLeft,
+  onStayConnected,
+  onDisconnect,
+}: InactivityWarningProps) {
   return (
     <div className="inactivity-warning" role="alert" aria-live="assertive">
       <div className="inactivity-warning-content">

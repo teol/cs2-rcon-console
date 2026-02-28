@@ -17,8 +17,8 @@ interface HistoryEntry {
 
 const HISTORY_KEY = "rcon_history";
 
-// Inactivity timeout: 5 minutes total, warning shown 60 seconds before
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+// Inactivity timeout: 15 minutes total, warning shown 60 seconds before
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 const WARNING_BEFORE_MS = 60 * 1000;
 
 function loadHistory(): HistoryEntry[] {
@@ -101,11 +101,7 @@ export function useRcon() {
           if (connectedRef.current) {
             wsRef.current?.send(JSON.stringify({ type: "disconnect" }));
             logFn("Session auto-disconnected due to inactivity.", "info");
-            setInactivityWarning(false);
-            if (countdownIntervalRef.current !== null) {
-              clearInterval(countdownIntervalRef.current);
-              countdownIntervalRef.current = null;
-            }
+            clearInactivityTimers();
           }
         }, WARNING_BEFORE_MS);
       }, warningDelay);
