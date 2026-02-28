@@ -1,27 +1,6 @@
-/** Structured server information parsed from the `status` and `stats` RCON commands. */
-export interface ServerInfo {
-  hostname: string;
-  map: string;
-  players: number;
-  maxPlayers: number;
-  bots: number;
-  version: string;
-  type: string;
-  secure: boolean;
-  fps: number;
-  cpu: number;
-}
+import type { ServerInfo, PlayerInfo } from "@cs2-rcon/shared";
 
-/** Structured player information parsed from the `status` RCON command. */
-export interface PlayerInfo {
-  userid: number;
-  name: string;
-  steamId: string;
-  connected: string;
-  ping: number;
-  loss: number;
-  state: string;
-}
+export type { ServerInfo, PlayerInfo };
 
 /**
  * Parse the output of the CS2 `status` RCON command.

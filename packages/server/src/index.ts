@@ -178,6 +178,19 @@ export async function buildApp() {
             let serverInfo: Partial<ServerInfo>;
             if (a2sResult.status === "fulfilled") {
               const a2s = a2sResult.value;
+              const serverTypeMap: Record<string, string> = {
+                d: "dedicated",
+                l: "listen",
+                p: "proxy",
+              };
+              const envMap: Record<string, string> = {
+                l: "Linux",
+                w: "Windows",
+                m: "Mac",
+                o: "Mac",
+              };
+              const serverTypeStr = serverTypeMap[a2s.serverType] ?? a2s.serverType;
+              const envStr = envMap[a2s.environment] ?? a2s.environment;
               serverInfo = {
                 hostname: a2s.hostname,
                 map: a2s.map,
@@ -185,7 +198,7 @@ export async function buildApp() {
                 maxPlayers: a2s.maxPlayers,
                 bots: a2s.bots,
                 version: a2s.version,
-                type: `${a2s.serverType === "d" ? "dedicated" : a2s.serverType === "l" ? "listen" : "proxy"} (${a2s.environment === "l" ? "Linux" : a2s.environment === "w" ? "Windows" : "Mac"})`,
+                type: `${serverTypeStr} (${envStr})`,
                 secure: a2s.vac,
                 fps,
                 cpu,

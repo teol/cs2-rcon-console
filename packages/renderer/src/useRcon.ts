@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { ServerInfo, PlayerInfo } from "@cs2-rcon/shared";
+
+export type { ServerInfo, PlayerInfo };
 
 export type LineType = "system" | "info" | "cmd" | "response" | "error";
 
@@ -13,29 +16,6 @@ interface HistoryEntry {
   host: string;
   port: string;
   date: number;
-}
-
-export interface ServerInfo {
-  hostname: string;
-  map: string;
-  players: number;
-  maxPlayers: number;
-  bots: number;
-  version: string;
-  type: string;
-  secure: boolean;
-  fps: number;
-  cpu: number;
-}
-
-export interface PlayerInfo {
-  userid: number;
-  name: string;
-  steamId: string;
-  connected: string;
-  ping: number;
-  loss: number;
-  state: string;
 }
 
 const MAX_SPARKLINE_POINTS = 30;
@@ -222,20 +202,12 @@ export function useRcon() {
             case "server_status":
               setServerStatus(msg.server);
               if (typeof msg.server.fps === "number" && msg.server.fps > 0) {
-                setFpsHistory((prev) => {
-                  const next = [...prev, msg.server.fps];
-                  return next.length > MAX_SPARKLINE_POINTS
-                    ? next.slice(-MAX_SPARKLINE_POINTS)
-                    : next;
-                });
+                setFpsHistory((prev) => [...prev, msg.server.fps].slice(-MAX_SPARKLINE_POINTS));
               }
               if (typeof msg.server.players === "number") {
-                setPlayerCountHistory((prev) => {
-                  const next = [...prev, msg.server.players];
-                  return next.length > MAX_SPARKLINE_POINTS
-                    ? next.slice(-MAX_SPARKLINE_POINTS)
-                    : next;
-                });
+                setPlayerCountHistory((prev) =>
+                  [...prev, msg.server.players].slice(-MAX_SPARKLINE_POINTS),
+                );
               }
               break;
             case "player_list":

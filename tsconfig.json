@@ -1,4 +1,8 @@
 {
   "files": [],
-  "references": [{ "path": "packages/rcon" }, { "path": "packages/server" }]
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/rcon" },
+    { "path": "packages/server" }
+  ]
 }
