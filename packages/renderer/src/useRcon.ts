@@ -15,6 +15,32 @@ interface HistoryEntry {
   date: number;
 }
 
+export interface ServerInfo {
+  hostname: string;
+  map: string;
+  players: number;
+  maxPlayers: number;
+  bots: number;
+  version: string;
+  type: string;
+  secure: boolean;
+  fps: number;
+  cpu: number;
+}
+
+export interface PlayerInfo {
+  userid: number;
+  name: string;
+  steamId: string;
+  connected: string;
+  ping: number;
+  loss: number;
+  state: string;
+}
+
+const MAX_SPARKLINE_POINTS = 30;
+const AUTO_REFRESH_KEY = "rcon_auto_refresh";
+
 const HISTORY_KEY = "rcon_history";
 
 // Inactivity timeout: 15 minutes total, warning shown 60 seconds before
@@ -44,12 +70,21 @@ export function useRcon() {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [inactivityWarning, setInactivityWarning] = useState(false);
   const [inactivitySecondsLeft, setInactivitySecondsLeft] = useState(0);
+  const [serverStatus, setServerStatus] = useState<ServerInfo | null>(null);
+  const [players, setPlayers] = useState<PlayerInfo[]>([]);
+  const [fpsHistory, setFpsHistory] = useState<number[]>([]);
+  const [playerCountHistory, setPlayerCountHistory] = useState<number[]>([]);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(() => {
+    const saved = localStorage.getItem(AUTO_REFRESH_KEY);
+    return saved ? parseInt(saved, 10) : 5;
+  });
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const log = useCallback((text: string, type: LineType = "system") => {
     setLines((prev) => [...prev, { id: lineId.current++, text, type }]);
@@ -187,6 +222,28 @@ export function useRcon() {
             case "error":
               log(msg.message, "error");
               break;
+            case "server_status":
+              setServerStatus(msg.server);
+              if (typeof msg.server.fps === "number" && msg.server.fps > 0) {
+                setFpsHistory((prev) => {
+                  const next = [...prev, msg.server.fps];
+                  return next.length > MAX_SPARKLINE_POINTS
+                    ? next.slice(-MAX_SPARKLINE_POINTS)
+                    : next;
+                });
+              }
+              if (typeof msg.server.players === "number") {
+                setPlayerCountHistory((prev) => {
+                  const next = [...prev, msg.server.players];
+                  return next.length > MAX_SPARKLINE_POINTS
+                    ? next.slice(-MAX_SPARKLINE_POINTS)
+                    : next;
+                });
+              }
+              break;
+            case "player_list":
+              setPlayers(msg.players);
+              break;
           }
         } catch (err) {
           console.error("Failed to parse WebSocket message:", err);
@@ -270,6 +327,44 @@ export function useRcon() {
     });
   }, []);
 
+  const requestStatus = useCallback(() => {
+    if (!connectedRef.current || !wsRef.current) return;
+    wsRef.current.send(JSON.stringify({ type: "request_status" }));
+  }, []);
+
+  const updateAutoRefreshInterval = useCallback((seconds: number) => {
+    setAutoRefreshInterval(seconds);
+    localStorage.setItem(AUTO_REFRESH_KEY, String(seconds));
+  }, []);
+
+  // Auto-refresh status when connected
+  useEffect(() => {
+    if (autoRefreshRef.current) {
+      clearInterval(autoRefreshRef.current);
+      autoRefreshRef.current = null;
+    }
+
+    if (connected && autoRefreshInterval > 0) {
+      // Initial fetch
+      requestStatus();
+      autoRefreshRef.current = setInterval(requestStatus, autoRefreshInterval * 1000);
+    }
+
+    if (!connected) {
+      setServerStatus(null);
+      setPlayers([]);
+      setFpsHistory([]);
+      setPlayerCountHistory([]);
+    }
+
+    return () => {
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    };
+  }, [connected, autoRefreshInterval, requestStatus]);
+
   return {
     connected,
     lines,
@@ -277,6 +372,11 @@ export function useRcon() {
     commandHistory,
     inactivityWarning,
     inactivitySecondsLeft,
+    serverStatus,
+    players,
+    fpsHistory,
+    playerCountHistory,
+    autoRefreshInterval,
     log,
     clearConsole,
     connectToServer,
@@ -284,5 +384,7 @@ export function useRcon() {
     sendCommand,
     removeFromHistory,
     resetInactivity,
+    requestStatus,
+    updateAutoRefreshInterval,
   };
 }

@@ -4,13 +4,15 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyWebSocket from "@fastify/websocket";
 import { RconClient } from "@cs2-rcon/rcon";
+import { parseStatus, parseStats } from "./parsers.js";
+import type { ServerInfo, PlayerInfo } from "./parsers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
 /** JSON messages sent from the browser to the server. */
 export interface ClientMessage {
-  type: "connect" | "command" | "disconnect";
+  type: "connect" | "command" | "disconnect" | "request_status";
   host?: string;
   port?: string;
   password?: string;
@@ -22,7 +24,9 @@ export type ServerMessage =
   | { type: "connected"; message: string }
   | { type: "disconnected" }
   | { type: "response"; command: string; body: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "server_status"; server: Partial<ServerInfo> }
+  | { type: "player_list"; players: PlayerInfo[] };
 
 export function send(ws: { send: (data: string) => void }, msg: ServerMessage): void {
   ws.send(JSON.stringify(msg));
@@ -136,6 +140,41 @@ export async function buildApp() {
             rcon = null;
           }
           send(socket, { type: "disconnected" });
+          break;
+        }
+
+        case "request_status": {
+          if (!rcon || !rcon.isConnected) {
+            return send(socket, {
+              type: "error",
+              message: "Not connected to any server",
+            });
+          }
+
+          try {
+            const [statusResponse, statsResponse] = await Promise.all([
+              rcon.execute("status"),
+              rcon.execute("stats"),
+            ]);
+
+            const { server, players } = parseStatus(statusResponse || "");
+            const { fps, cpu } = parseStats(statsResponse || "");
+
+            send(socket, {
+              type: "server_status",
+              server: { ...server, fps, cpu },
+            });
+
+            send(socket, {
+              type: "player_list",
+              players,
+            });
+          } catch (err) {
+            send(socket, {
+              type: "error",
+              message: `Status request failed: ${(err as Error).message}`,
+            });
+          }
           break;
         }
 
