@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-types/
 
 # Yarn
 .yarn/*
@@ -20,3 +21,4 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+*.tsbuildinfo

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { send, type ServerMessage } from "./server.js";
+import { describe, it, expect, vi } from "vitest";
+import { send, type ServerMessage } from "./index.js";
 
 // ---------------------------------------------------------------------------
 // send() helper

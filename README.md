@@ -7,11 +7,11 @@ Web-based RCON console for Counter-Strike 2 servers, inspired by [rcon.srcds.pro
 ```
 ┌─────────────┐     WebSocket     ┌──────────────┐     TCP (RCON)     ┌─────────────┐
 │   Browser    │ ◄──────────────► │   Node.js    │ ◄───────────────► │  CS2 Server │
-│  (Frontend)  │                  │  (Fastify)   │                    │    :27015   │
+│  (React)     │                  │  (Fastify)   │                    │    :27015   │
 └─────────────┘                   └──────────────┘                    └─────────────┘
 ```
 
-- **Frontend** — Static single-file HTML/CSS/JS with interactive console, quick commands, server history
+- **Frontend** — Vite + React 19 SPA with interactive console, quick commands, server history
 - **Backend** — Fastify + `@fastify/websocket` acting as a TCP proxy
 - **RCON** — Pure TypeScript implementation of the [Source RCON protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol)
 
@@ -37,15 +37,41 @@ Browsers cannot open raw TCP connections. The Node.js backend bridges the browse
 corepack enable
 yarn install
 yarn build
-yarn start
+yarn workspace @cs2-rcon/server start
 ```
 
 Open <http://localhost:3000>.
 
-For development with auto-rebuild:
+## Development
+
+Run the Vite dev server (HMR) and the Fastify backend in parallel:
+
+```bash
+# Terminal 1 — Fastify backend
+yarn workspace @cs2-rcon/server dev
+
+# Terminal 2 — Vite frontend (proxies /ws to localhost:3000)
+yarn workspace @cs2-rcon/renderer dev
+```
+
+Or start everything at once:
 
 ```bash
 yarn dev
+```
+
+## Project structure
+
+```
+cs2-rcon-console/
+├── packages/
+│   ├── rcon/            # @cs2-rcon/rcon  — RCON protocol client library
+│   ├── renderer/        # @cs2-rcon/renderer — Vite + React frontend
+│   └── server/          # @cs2-rcon/server — Fastify WebSocket server
+├── package.json         # Yarn workspaces root
+├── tsconfig.base.json   # Shared TypeScript config
+├── .yarnrc.yml          # Yarn 4 (nodeLinker: node-modules)
+└── .yarn/releases/      # Yarn 4 binary (committed)
 ```
 
 ## Configuration
@@ -53,21 +79,6 @@ yarn dev
 | Environment variable | Default | Description     |
 | -------------------- | ------- | --------------- |
 | `PORT`               | `3000`  | Web server port |
-
-## Project structure
-
-```
-├── src/
-│   ├── server.ts        # Fastify + WebSocket server
-│   └── rcon.ts          # RCON client (Source RCON TCP protocol)
-├── public/
-│   └── index.html       # Full frontend (HTML/CSS/JS)
-├── dist/                # Compiled output (git-ignored)
-├── package.json
-├── tsconfig.json
-├── .yarnrc.yml
-└── .yarn/releases/      # Yarn 4 binary (committed)
-```
 
 ## Production deployment with Nginx
 
@@ -85,7 +96,7 @@ Use **systemd** or **pm2** to keep the server running:
 
 ```bash
 # With pm2
-pm2 start dist/server.js --name cs2-rcon
+pm2 start packages/server/dist/index.js --name cs2-rcon
 
 # Or with systemd (create /etc/systemd/system/cs2-rcon.service)
 ```
@@ -101,7 +112,7 @@ After=network.target
 Type=simple
 User=cs2rcon
 WorkingDirectory=/opt/cs2-rcon-console
-ExecStart=/usr/bin/node dist/server.js
+ExecStart=/usr/bin/node packages/server/dist/index.js
 Restart=on-failure
 Environment=PORT=3000
 
