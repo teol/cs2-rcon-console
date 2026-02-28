@@ -30,11 +30,11 @@ function persistHistory(history: HistoryEntry[]) {
 }
 
 export function useRcon() {
-  const lineId = useRef(0);
+  const lineId = useRef(2);
   const [connected, setConnected] = useState(false);
   const [lines, setLines] = useState<ConsoleLine[]>([
-    { id: lineId.current++, text: "CS2 Web RCON Console v2.0.0", type: "system" },
-    { id: lineId.current++, text: "Enter server details and connect to begin.", type: "system" },
+    { id: 0, text: "CS2 Web RCON Console v2.0.0", type: "system" },
+    { id: 1, text: "Enter server details and connect to begin.", type: "system" },
   ]);
   const [serverHistory, setServerHistory] = useState<HistoryEntry[]>(loadHistory);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
