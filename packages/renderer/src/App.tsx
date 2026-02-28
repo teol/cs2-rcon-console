@@ -1,6 +1,7 @@
 import { useRcon } from "./useRcon.ts";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { Console } from "./components/Console.tsx";
+import { InactivityWarning } from "./components/InactivityWarning.tsx";
 
 export function App() {
   const {
@@ -8,11 +9,14 @@ export function App() {
     lines,
     serverHistory,
     commandHistory,
+    inactivityWarning,
+    inactivitySecondsLeft,
     clearConsole,
     connectToServer,
     disconnect,
     sendCommand,
     removeFromHistory,
+    resetInactivity,
   } = useRcon();
 
   return (
@@ -28,6 +32,14 @@ export function App() {
           <span>{connected ? "Connected" : "Disconnected"}</span>
         </div>
       </header>
+
+      {inactivityWarning && (
+        <InactivityWarning
+          secondsLeft={inactivitySecondsLeft}
+          onStayConnected={resetInactivity}
+          onDisconnect={disconnect}
+        />
+      )}
 
       <div className="main">
         <Sidebar

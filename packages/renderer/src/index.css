@@ -485,6 +485,81 @@ input:focus {
   cursor: not-allowed;
 }
 
+/* ─── INACTIVITY WARNING ─── */
+.inactivity-warning {
+  background: rgba(251, 191, 36, 0.12);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.35);
+  flex-shrink: 0;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.inactivity-warning-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+}
+
+.inactivity-warning-icon {
+  font-size: 15px;
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.inactivity-warning-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--warning);
+  font-family: "Inter", sans-serif;
+  min-width: 0;
+}
+
+.inactivity-warning-text strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.inactivity-warning-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-stay-connected {
+  background: var(--warning);
+  color: #0a0e14;
+  font-size: 11px;
+  padding: 5px 14px;
+}
+
+.btn-stay-connected:hover {
+  background: #fcd34d;
+}
+
+.btn-disconnect-now {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  padding: 5px 14px;
+}
+
+.btn-disconnect-now:hover {
+  color: var(--error);
+  border-color: var(--error);
+}
+
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar {
   width: 6px;
