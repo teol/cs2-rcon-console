@@ -55,13 +55,17 @@ export function useRcon() {
     connectedRef.current = connected;
   }, [connected]);
 
-  // WebSocket connection
+  // WebSocket connection with exponential backoff
   useEffect(() => {
+    let reconnectDelay = 1000;
+    const MAX_RECONNECT_DELAY = 30000;
+
     function connect() {
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
       ws.onopen = () => {
+        reconnectDelay = 1000;
         log("WebSocket connected to backend.", "system");
       };
 
@@ -95,8 +99,9 @@ export function useRcon() {
 
       ws.onclose = () => {
         setConnected(false);
-        log("WebSocket connection lost. Reconnecting...", "error");
-        setTimeout(connect, 2000);
+        log(`WebSocket connection lost. Reconnecting in ${reconnectDelay / 1000}s...`, "error");
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
       };
 
       ws.onerror = () => {

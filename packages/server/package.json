@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -b",
-    "dev": "tsc -b && node --watch dist/index.js",
+    "dev": "tsc-watch -b --onSuccess \"node dist/index.js\"",
     "start": "node dist/index.js",
     "typecheck": "tsc -b",
     "test": "vitest run"
@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "tsc-watch": "^7.2.0",
     "typescript": "^5.8.0",
     "vitest": "^4.0.18"
   }
