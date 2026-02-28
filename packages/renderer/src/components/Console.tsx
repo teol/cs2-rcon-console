@@ -35,28 +35,31 @@ export function Console({ lines, connected, commandHistory, onCommand, onClear }
     setHistoryIndex(-1);
   }, [inputValue, onCommand]);
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") {
-      sendFromInput();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (historyIndex < commandHistory.length - 1) {
-        const next = historyIndex + 1;
-        setHistoryIndex(next);
-        setInputValue(commandHistory[next]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        sendFromInput();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (historyIndex < commandHistory.length - 1) {
+          const next = historyIndex + 1;
+          setHistoryIndex(next);
+          setInputValue(commandHistory[next]);
+        }
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          const next = historyIndex - 1;
+          setHistoryIndex(next);
+          setInputValue(commandHistory[next]);
+        } else {
+          setHistoryIndex(-1);
+          setInputValue("");
+        }
       }
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const next = historyIndex - 1;
-        setHistoryIndex(next);
-        setInputValue(commandHistory[next]);
-      } else {
-        setHistoryIndex(-1);
-        setInputValue("");
-      }
-    }
-  }
+    },
+    [sendFromInput, historyIndex, commandHistory],
+  );
 
   return (
     <div className="console-area">
