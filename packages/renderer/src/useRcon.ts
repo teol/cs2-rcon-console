@@ -126,6 +126,32 @@ export function useRcon() {
     // log is stable. connected is the only varying dep.
   }, [connected, startInactivityTimers, clearInactivityTimers, log]);
 
+  // Reset inactivity timer on any global user interaction while connected
+  useEffect(() => {
+    if (!connected) return;
+
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function handleActivity() {
+      if (throttleTimer !== null) return;
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        resetInactivity();
+      }, 500);
+    }
+
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("click", handleActivity);
+
+    return () => {
+      if (throttleTimer !== null) clearTimeout(throttleTimer);
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("click", handleActivity);
+    };
+  }, [connected, resetInactivity]);
+
   // WebSocket connection with exponential backoff
   useEffect(() => {
     let reconnectDelay = 1000;
