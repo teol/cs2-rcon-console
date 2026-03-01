@@ -2,6 +2,8 @@ import { useRcon } from "./useRcon.ts";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { Console } from "./components/Console.tsx";
 import { InactivityWarning } from "./components/InactivityWarning.tsx";
+import { ServerStatus } from "./components/ServerStatus.tsx";
+import { PlayerTable } from "./components/PlayerTable.tsx";
 
 export function App() {
   const {
@@ -11,12 +13,19 @@ export function App() {
     commandHistory,
     inactivityWarning,
     inactivitySecondsLeft,
+    serverStatus,
+    players,
+    fpsHistory,
+    playerCountHistory,
+    autoRefreshInterval,
     clearConsole,
     connectToServer,
     disconnect,
     sendCommand,
     removeFromHistory,
     resetInactivity,
+    requestStatus,
+    updateAutoRefreshInterval,
   } = useRcon();
 
   return (
@@ -50,13 +59,33 @@ export function App() {
           onCommand={sendCommand}
           onRemoveHistory={removeFromHistory}
         />
-        <Console
-          lines={lines}
-          connected={connected}
-          commandHistory={commandHistory}
-          onCommand={sendCommand}
-          onClear={clearConsole}
-        />
+        <div className="content-area">
+          {connected && (
+            <>
+              <ServerStatus
+                status={serverStatus}
+                fpsHistory={fpsHistory}
+                playerCountHistory={playerCountHistory}
+                autoRefreshInterval={autoRefreshInterval}
+                onRefreshIntervalChange={updateAutoRefreshInterval}
+                onManualRefresh={requestStatus}
+              />
+              <PlayerTable
+                players={players}
+                maxPlayers={serverStatus?.maxPlayers ?? 0}
+                connected={connected}
+                onCommand={sendCommand}
+              />
+            </>
+          )}
+          <Console
+            lines={lines}
+            connected={connected}
+            commandHistory={commandHistory}
+            onCommand={sendCommand}
+            onClear={clearConsole}
+          />
+        </div>
       </div>
     </>
   );

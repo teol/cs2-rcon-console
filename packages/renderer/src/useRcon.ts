@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { ServerInfo, PlayerInfo } from "@cs2-rcon/shared";
+
+export type { ServerInfo, PlayerInfo };
 
 export type LineType = "system" | "info" | "cmd" | "response" | "error";
 
@@ -14,6 +17,9 @@ interface HistoryEntry {
   port: string;
   date: number;
 }
+
+const MAX_SPARKLINE_POINTS = 30;
+const AUTO_REFRESH_KEY = "rcon_auto_refresh";
 
 const HISTORY_KEY = "rcon_history";
 
@@ -44,12 +50,21 @@ export function useRcon() {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [inactivityWarning, setInactivityWarning] = useState(false);
   const [inactivitySecondsLeft, setInactivitySecondsLeft] = useState(0);
+  const [serverStatus, setServerStatus] = useState<ServerInfo | null>(null);
+  const [players, setPlayers] = useState<PlayerInfo[]>([]);
+  const [fpsHistory, setFpsHistory] = useState<number[]>([]);
+  const [playerCountHistory, setPlayerCountHistory] = useState<number[]>([]);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(() => {
+    const value = parseInt(localStorage.getItem(AUTO_REFRESH_KEY) ?? "invalid", 10);
+    return isNaN(value) ? 5 : value;
+  });
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const log = useCallback((text: string, type: LineType = "system") => {
     setLines((prev) => [...prev, { id: lineId.current++, text, type }]);
@@ -184,6 +199,20 @@ export function useRcon() {
             case "error":
               log(msg.message, "error");
               break;
+            case "server_status":
+              setServerStatus(msg.server);
+              if (typeof msg.server.fps === "number") {
+                setFpsHistory((prev) => [...prev, msg.server.fps].slice(-MAX_SPARKLINE_POINTS));
+              }
+              if (typeof msg.server.players === "number") {
+                setPlayerCountHistory((prev) =>
+                  [...prev, msg.server.players].slice(-MAX_SPARKLINE_POINTS),
+                );
+              }
+              break;
+            case "player_list":
+              setPlayers(msg.players);
+              break;
           }
         } catch (err) {
           console.error("Failed to parse WebSocket message:", err);
@@ -267,6 +296,39 @@ export function useRcon() {
     });
   }, []);
 
+  const requestStatus = useCallback(() => {
+    if (!connectedRef.current || !wsRef.current) return;
+    wsRef.current.send(JSON.stringify({ type: "request_status" }));
+  }, []);
+
+  const updateAutoRefreshInterval = useCallback((seconds: number) => {
+    setAutoRefreshInterval(seconds);
+    localStorage.setItem(AUTO_REFRESH_KEY, String(seconds));
+  }, []);
+
+  // Auto-refresh status when connected
+  useEffect(() => {
+    if (connected && autoRefreshInterval > 0) {
+      // Initial fetch
+      requestStatus();
+      autoRefreshRef.current = setInterval(requestStatus, autoRefreshInterval * 1000);
+    }
+
+    if (!connected) {
+      setServerStatus(null);
+      setPlayers([]);
+      setFpsHistory([]);
+      setPlayerCountHistory([]);
+    }
+
+    return () => {
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    };
+  }, [connected, autoRefreshInterval, requestStatus]);
+
   return {
     connected,
     lines,
@@ -274,6 +336,11 @@ export function useRcon() {
     commandHistory,
     inactivityWarning,
     inactivitySecondsLeft,
+    serverStatus,
+    players,
+    fpsHistory,
+    playerCountHistory,
+    autoRefreshInterval,
     log,
     clearConsole,
     connectToServer,
@@ -281,5 +348,7 @@ export function useRcon() {
     sendCommand,
     removeFromHistory,
     resetInactivity,
+    requestStatus,
+    updateAutoRefreshInterval,
   };
 }

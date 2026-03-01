@@ -1,0 +1,22 @@
+{
+  "name": "@cs2-rcon/shared",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types for CS2 RCON",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}
