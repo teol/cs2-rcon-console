@@ -7,9 +7,14 @@ import { RconClient } from "@cs2-rcon/rcon";
 import { parseStatus, parseStats } from "./parsers.js";
 import type { ServerInfo, PlayerInfo } from "./parsers.js";
 import { queryA2SInfo } from "./a2s.js";
+import { LogReceiver } from "./log-receiver.js";
+import type { LogMessage } from "./log-receiver.js";
+import type { LogEvent } from "@cs2-rcon/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
+const LOG_PORT = process.env.LOG_PORT ? Number(process.env.LOG_PORT) : 0;
+const LOG_ADDRESS = process.env.LOG_ADDRESS || "";
 
 const SERVER_TYPE_MAP: Record<string, string> = {
   d: "dedicated",
@@ -26,7 +31,7 @@ const ENV_MAP: Record<string, string> = {
 
 /** JSON messages sent from the browser to the server. */
 export interface ClientMessage {
-  type: "connect" | "command" | "disconnect" | "request_status";
+  type: "connect" | "command" | "disconnect" | "request_status" | "enable_logs" | "disable_logs";
   host?: string;
   port?: string;
   password?: string;
@@ -40,14 +45,16 @@ export type ServerMessage =
   | { type: "response"; command: string; body: string }
   | { type: "error"; message: string }
   | { type: "server_status"; server: Partial<ServerInfo> }
-  | { type: "player_list"; players: PlayerInfo[] };
+  | { type: "player_list"; players: PlayerInfo[] }
+  | { type: "log_event"; event: LogEvent }
+  | { type: "log_streaming"; enabled: boolean; message: string };
 
 export function send(ws: { send: (data: string) => void }, msg: ServerMessage): void {
   ws.send(JSON.stringify(msg));
 }
 
 /** Create and configure the Fastify app (without starting it). */
-export async function buildApp() {
+export async function buildApp(logReceiver?: LogReceiver) {
   const app = Fastify({ logger: false });
 
   // Serve the Vite-built renderer output
@@ -62,6 +69,7 @@ export async function buildApp() {
     let rcon: RconClient | null = null;
     let rconHost: string | null = null;
     let rconPort: number | null = null;
+    let logListener: ((msg: LogMessage) => void) | null = null;
 
     console.log("[WS] New client connected");
 
@@ -231,6 +239,82 @@ export async function buildApp() {
           break;
         }
 
+        case "enable_logs": {
+          // Remove any pre-existing listener for this client to prevent leaks
+          // when the client calls enable_logs multiple times without disabling.
+          if (logListener && logReceiver) {
+            logReceiver.removeListener("log", logListener);
+            logListener = null;
+          }
+
+          if (!logReceiver || !logReceiver.listening) {
+            return send(socket, {
+              type: "log_streaming",
+              enabled: false,
+              message:
+                "Log streaming is not configured on this server (set LOG_PORT and LOG_ADDRESS env vars)",
+            });
+          }
+
+          if (!rcon || !rcon.isConnected || !rconHost) {
+            return send(socket, {
+              type: "error",
+              message: "Not connected to any server",
+            });
+          }
+
+          // Register a log listener scoped to this client's CS2 server
+          const targetHost = rconHost;
+          logListener = (logMsg: LogMessage) => {
+            if (logMsg.sourceIp === targetHost) {
+              send(socket, { type: "log_event", event: logMsg.event });
+            }
+          };
+          logReceiver.on("log", logListener);
+
+          // Tell the CS2 server to send logs to us
+          try {
+            await rcon.execute(`logaddress_add "${LOG_ADDRESS}:${logReceiver.port}"`);
+            send(socket, {
+              type: "log_streaming",
+              enabled: true,
+              message: "Log streaming enabled",
+            });
+            console.log(`[LOG] Streaming enabled for ${targetHost}`);
+          } catch (err) {
+            logReceiver.removeListener("log", logListener);
+            logListener = null;
+            send(socket, {
+              type: "error",
+              message: `Failed to enable log streaming: ${(err as Error).message}`,
+            });
+          }
+          break;
+        }
+
+        case "disable_logs": {
+          if (logListener && logReceiver) {
+            logReceiver.removeListener("log", logListener);
+            logListener = null;
+          }
+
+          if (rcon && rcon.isConnected && logReceiver?.listening) {
+            try {
+              await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
+            } catch {
+              // Best effort — the server may already be disconnected
+            }
+          }
+
+          send(socket, {
+            type: "log_streaming",
+            enabled: false,
+            message: "Log streaming disabled",
+          });
+          console.log("[LOG] Streaming disabled");
+          break;
+        }
+
         default:
           send(socket, {
             type: "error",
@@ -241,6 +325,11 @@ export async function buildApp() {
 
     socket.on("close", () => {
       console.log("[WS] Client disconnected");
+      // Clean up log listener
+      if (logListener && logReceiver) {
+        logReceiver.removeListener("log", logListener);
+        logListener = null;
+      }
       if (rcon) {
         rcon.disconnect();
         rcon = null;
@@ -254,7 +343,15 @@ export async function buildApp() {
 }
 
 async function main(): Promise<void> {
-  const app = await buildApp();
+  let logReceiver: LogReceiver | undefined;
+
+  if (LOG_PORT > 0 && LOG_ADDRESS) {
+    logReceiver = new LogReceiver();
+    await logReceiver.start(LOG_PORT);
+    console.log(`[LOG] UDP log receiver listening on port ${LOG_PORT} (address: ${LOG_ADDRESS})`);
+  }
+
+  const app = await buildApp(logReceiver);
   await app.listen({ port: PORT, host: "0.0.0.0" });
   console.log(`CS2 Web RCON running on http://localhost:${PORT}`);
 }

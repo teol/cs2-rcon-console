@@ -18,6 +18,8 @@ export function App() {
     fpsHistory,
     playerCountHistory,
     autoRefreshInterval,
+    showTimestamps,
+    logStreaming,
     clearConsole,
     connectToServer,
     disconnect,
@@ -26,6 +28,8 @@ export function App() {
     resetInactivity,
     requestStatus,
     updateAutoRefreshInterval,
+    toggleTimestamps,
+    toggleLogStreaming,
   } = useRcon();
 
   return (
@@ -82,8 +86,12 @@ export function App() {
             lines={lines}
             connected={connected}
             commandHistory={commandHistory}
+            showTimestamps={showTimestamps}
+            logStreaming={logStreaming}
             onCommand={sendCommand}
             onClear={clearConsole}
+            onToggleTimestamps={toggleTimestamps}
+            onToggleLogStreaming={toggleLogStreaming}
           />
         </div>
       </div>
