@@ -201,7 +201,7 @@ export function useRcon() {
               break;
             case "server_status":
               setServerStatus(msg.server);
-              if (typeof msg.server.fps === "number" && msg.server.fps > 0) {
+              if (typeof msg.server.fps === "number") {
                 setFpsHistory((prev) => [...prev, msg.server.fps].slice(-MAX_SPARKLINE_POINTS));
               }
               if (typeof msg.server.players === "number") {
