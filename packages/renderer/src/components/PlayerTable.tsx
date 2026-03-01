@@ -187,7 +187,7 @@ export function PlayerTable({ players, maxPlayers, connected, onCommand }: Playe
                   </div>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     placeholder="30"
                     value={banMinutes}
                     onChange={(e) => setBanMinutes(e.target.value)}
