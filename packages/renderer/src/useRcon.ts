@@ -55,7 +55,7 @@ export function useRcon() {
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const [playerCountHistory, setPlayerCountHistory] = useState<number[]>([]);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(() => {
-    const value = parseInt(localStorage.getItem(AUTO_REFRESH_KEY) ?? 'invalid', 10);
+    const value = parseInt(localStorage.getItem(AUTO_REFRESH_KEY) ?? "invalid", 10);
     return isNaN(value) ? 5 : value;
   });
 

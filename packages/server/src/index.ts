@@ -11,6 +11,19 @@ import { queryA2SInfo } from "./a2s.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
+const SERVER_TYPE_MAP: Record<string, string> = {
+  d: "dedicated",
+  l: "listen",
+  p: "proxy",
+};
+
+const ENV_MAP: Record<string, string> = {
+  l: "Linux",
+  w: "Windows",
+  m: "Mac",
+  o: "Mac",
+};
+
 /** JSON messages sent from the browser to the server. */
 export interface ClientMessage {
   type: "connect" | "command" | "disconnect" | "request_status";
@@ -178,19 +191,8 @@ export async function buildApp() {
             let serverInfo: Partial<ServerInfo>;
             if (a2sResult.status === "fulfilled") {
               const a2s = a2sResult.value;
-              const serverTypeMap: Record<string, string> = {
-                d: "dedicated",
-                l: "listen",
-                p: "proxy",
-              };
-              const envMap: Record<string, string> = {
-                l: "Linux",
-                w: "Windows",
-                m: "Mac",
-                o: "Mac",
-              };
-              const serverTypeStr = serverTypeMap[a2s.serverType] ?? a2s.serverType;
-              const envStr = envMap[a2s.environment] ?? a2s.environment;
+              const serverTypeStr = SERVER_TYPE_MAP[a2s.serverType] ?? a2s.serverType;
+              const envStr = ENV_MAP[a2s.environment] ?? a2s.environment;
               serverInfo = {
                 hostname: a2s.hostname,
                 map: a2s.map,
