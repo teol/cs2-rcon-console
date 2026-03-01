@@ -167,4 +167,47 @@ describe("parseStats", () => {
     expect(result.cpu).toBeCloseTo(25.3);
     expect(result.fps).toBeCloseTo(128.5);
   });
+
+  it("handles reordered columns", () => {
+    const raw = `FPS   NetIn   CPU    NetOut    Uptime  Maps   Players  Svms    +-ms   ~tick
+128.00    1.2   10.5     0.8       5      2        8      1.50   0.20   0.05`;
+
+    const result = parseStats(raw);
+    expect(result.fps).toBeCloseTo(128.0);
+    expect(result.cpu).toBeCloseTo(10.5);
+  });
+
+  it("handles extra columns added between CPU and FPS", () => {
+    const raw = `CPU    NetIn   NetOut   Extra   Uptime  Maps   FPS   Players
+ 15.0    1.0     0.5      42       3      1   64.00     2`;
+
+    const result = parseStats(raw);
+    expect(result.cpu).toBeCloseTo(15.0);
+    expect(result.fps).toBeCloseTo(64.0);
+  });
+
+  it("returns zeros when header exists but no data line follows", () => {
+    const raw = `CPU    NetIn   NetOut    Uptime  Maps   FPS   Players`;
+    expect(parseStats(raw)).toEqual({ fps: 0, cpu: 0 });
+  });
+
+  it("handles header without FPS column", () => {
+    const raw = `CPU    NetIn   NetOut    Uptime
+ 10.0    0.0     0.0       1`;
+
+    const result = parseStats(raw);
+    expect(result.cpu).toBeCloseTo(10.0);
+    expect(result.fps).toBe(0);
+  });
+
+  it("skips leading blank lines before header", () => {
+    const raw = `
+
+CPU    NetIn   NetOut    Uptime  Maps   FPS   Players
+ 5.0    0.0     0.0       1      1   128.00     0`;
+
+    const result = parseStats(raw);
+    expect(result.cpu).toBeCloseTo(5.0);
+    expect(result.fps).toBeCloseTo(128.0);
+  });
 });

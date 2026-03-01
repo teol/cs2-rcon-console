@@ -94,6 +94,11 @@ export function parseStatus(raw: string): {
 /**
  * Parse the output of the CS2 `stats` RCON command.
  *
+ * The parser reads the header line to discover column positions for "CPU"
+ * and "FPS", then extracts the corresponding values from the first data
+ * line.  This makes it resilient to column reordering or the addition of
+ * new columns in future game updates.
+ *
  * Example output:
  * ```
  * CPU    NetIn   NetOut    Uptime  Maps   FPS   Players  Svms    +-ms   ~tick
@@ -102,14 +107,26 @@ export function parseStatus(raw: string): {
  */
 export function parseStats(raw: string): { fps: number; cpu: number } {
   const lines = raw.split("\n").filter((l) => l.trim());
-  for (const line of lines) {
-    const match = line.trim().match(/^([\d.]+)\s+[\d.]+\s+[\d.]+\s+\d+\s+\d+\s+([\d.]+)/);
-    if (match) {
-      return {
-        cpu: parseFloat(match[1]),
-        fps: parseFloat(match[2]),
-      };
-    }
-  }
-  return { fps: 0, cpu: 0 };
+  if (lines.length < 2) return { fps: 0, cpu: 0 };
+
+  // Find the header line — the one containing a "CPU" or "FPS" label
+  const headerIdx = lines.findIndex((l) => /\bCPU\b/i.test(l) || /\bFPS\b/i.test(l));
+  if (headerIdx === -1 || headerIdx >= lines.length - 1) return { fps: 0, cpu: 0 };
+
+  // Split header into column names and locate the ones we care about
+  const headers = lines[headerIdx].trim().split(/\s+/);
+  const cpuCol = headers.findIndex((h) => h.toUpperCase() === "CPU");
+  const fpsCol = headers.findIndex((h) => h.toUpperCase() === "FPS");
+  if (cpuCol === -1 && fpsCol === -1) return { fps: 0, cpu: 0 };
+
+  // The data line is the next non-empty line after the header
+  const values = lines[headerIdx + 1].trim().split(/\s+/);
+
+  const cpu = cpuCol !== -1 && cpuCol < values.length ? parseFloat(values[cpuCol]) : 0;
+  const fps = fpsCol !== -1 && fpsCol < values.length ? parseFloat(values[fpsCol]) : 0;
+
+  return {
+    cpu: isNaN(cpu) ? 0 : cpu,
+    fps: isNaN(fps) ? 0 : fps,
+  };
 }

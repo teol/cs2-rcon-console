@@ -114,6 +114,8 @@ export async function buildApp() {
               message: `Connection failed: ${(err as Error).message}`,
             });
             rcon = null;
+            rconHost = null;
+            rconPort = null;
           }
           break;
         }
@@ -156,6 +158,8 @@ export async function buildApp() {
           if (rcon) {
             rcon.disconnect();
             rcon = null;
+            rconHost = null;
+            rconPort = null;
           }
           send(socket, { type: "disconnected" });
           break;
@@ -240,6 +244,8 @@ export async function buildApp() {
       if (rcon) {
         rcon.disconnect();
         rcon = null;
+        rconHost = null;
+        rconPort = null;
       }
     });
   });
