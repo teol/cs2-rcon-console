@@ -308,11 +308,6 @@ export function useRcon() {
 
   // Auto-refresh status when connected
   useEffect(() => {
-    if (autoRefreshRef.current) {
-      clearInterval(autoRefreshRef.current);
-      autoRefreshRef.current = null;
-    }
-
     if (connected && autoRefreshInterval > 0) {
       // Initial fetch
       requestStatus();
