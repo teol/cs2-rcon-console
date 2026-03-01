@@ -52,12 +52,6 @@ function persistHistory(history: HistoryEntry[]) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
-/** Trim lines array to the maximum, keeping the most recent entries. */
-function trimLines(lines: ConsoleLine[]): ConsoleLine[] {
-  if (lines.length <= MAX_CONSOLE_LINES) return lines;
-  return lines.slice(lines.length - MAX_CONSOLE_LINES);
-}
-
 export function useRcon() {
   const lineId = useRef(2);
   const now = Date.now();
@@ -91,9 +85,10 @@ export function useRcon() {
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const log = useCallback((text: string, type: LineType = "system") => {
-    setLines((prev) =>
-      trimLines([...prev, { id: lineId.current++, text, type, timestamp: Date.now() }]),
-    );
+    setLines((prev) => [
+      ...prev.slice(prev.length >= MAX_CONSOLE_LINES ? 1 : 0),
+      { id: lineId.current++, text, type, timestamp: Date.now() },
+    ]);
   }, []);
 
   const clearConsole = useCallback(() => {

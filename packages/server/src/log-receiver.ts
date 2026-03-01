@@ -75,18 +75,25 @@ export class LogReceiver extends EventEmitter {
     let text: string;
 
     // CS2 prefixes UDP log lines with the OOB header: FF FF FF FF
-    // followed by "log\0" (4 + 4 = 8 bytes).  Strip it if present.
+    // followed by "log" and an optional null terminator. Strip it if present.
     if (
-      buf.length > 8 &&
+      buf.length > 4 &&
       buf[0] === 0xff &&
       buf[1] === 0xff &&
       buf[2] === 0xff &&
       buf[3] === 0xff
     ) {
-      // Skip the 4-byte header + "log\0" (or just "log" without null)
-      const headerEnd = buf.indexOf(0x00, 4);
-      const offset = headerEnd !== -1 ? headerEnd + 1 : 8;
-      text = buf.subarray(offset).toString("utf8");
+      let offset = 4; // Start after OOB prefix
+      if (buf.length > offset + 3 && buf.toString("ascii", offset, offset + 3) === "log") {
+        offset += 3; // "log" is 3 bytes
+        if (buf.length > offset && buf[offset] === 0x00) {
+          offset += 1; // Optional null terminator
+        }
+      } else {
+        // Fallback for an unknown payload: assume an 8-byte header.
+        offset = 8;
+      }
+      text = buf.subarray(Math.min(offset, buf.length)).toString("utf8");
     } else {
       text = buf.toString("utf8");
     }

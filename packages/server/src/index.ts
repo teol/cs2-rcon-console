@@ -240,6 +240,13 @@ export async function buildApp(logReceiver?: LogReceiver) {
         }
 
         case "enable_logs": {
+          // Remove any pre-existing listener for this client to prevent leaks
+          // when the client calls enable_logs multiple times without disabling.
+          if (logListener && logReceiver) {
+            logReceiver.removeListener("log", logListener);
+            logListener = null;
+          }
+
           if (!logReceiver || !logReceiver.listening) {
             return send(socket, {
               type: "log_streaming",
