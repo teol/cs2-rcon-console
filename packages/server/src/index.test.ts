@@ -44,4 +44,38 @@ describe("send", () => {
 
     expect(JSON.parse(ws.send.mock.calls[0][0])).toEqual({ type: "disconnected" });
   });
+
+  it("serialises log_event messages", () => {
+    const ws = { send: vi.fn() };
+    const event = {
+      timestamp: "03/01/2024 - 12:34:56",
+      category: "kill" as const,
+      message: "Player killed Victim with ak47",
+      raw: 'L 03/01/2024 - 12:34:56: "Player" killed "Victim" with "ak47"',
+    };
+    const msg: ServerMessage = { type: "log_event", event };
+
+    send(ws, msg);
+
+    const parsed = JSON.parse(ws.send.mock.calls[0][0]);
+    expect(parsed.type).toBe("log_event");
+    expect(parsed.event.category).toBe("kill");
+    expect(parsed.event.message).toBe("Player killed Victim with ak47");
+  });
+
+  it("serialises log_streaming messages", () => {
+    const ws = { send: vi.fn() };
+    const msg: ServerMessage = {
+      type: "log_streaming",
+      enabled: true,
+      message: "Log streaming enabled",
+    };
+
+    send(ws, msg);
+
+    const parsed = JSON.parse(ws.send.mock.calls[0][0]);
+    expect(parsed.type).toBe("log_streaming");
+    expect(parsed.enabled).toBe(true);
+    expect(parsed.message).toBe("Log streaming enabled");
+  });
 });

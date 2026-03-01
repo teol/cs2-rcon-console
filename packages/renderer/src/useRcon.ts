@@ -3,12 +3,13 @@ import type { ServerInfo, PlayerInfo } from "@cs2-rcon/shared";
 
 export type { ServerInfo, PlayerInfo };
 
-export type LineType = "system" | "info" | "cmd" | "response" | "error";
+export type LineType = "system" | "info" | "cmd" | "response" | "error" | "log";
 
 export interface ConsoleLine {
   id: number;
   text: string;
   type: LineType;
+  timestamp: number;
 }
 
 interface HistoryEntry {
@@ -18,14 +19,26 @@ interface HistoryEntry {
   date: number;
 }
 
+export const MAX_CONSOLE_LINES = 1000;
 const MAX_SPARKLINE_POINTS = 30;
 const AUTO_REFRESH_KEY = "rcon_auto_refresh";
+const SHOW_TIMESTAMPS_KEY = "rcon_show_timestamps";
+const LOG_STREAMING_KEY = "rcon_log_streaming";
 
 const HISTORY_KEY = "rcon_history";
 
 // Inactivity timeout: 15 minutes total, warning shown 60 seconds before
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 const WARNING_BEFORE_MS = 60 * 1000;
+
+/** Format a timestamp (Date.now() value) as HH:MM:SS. */
+export function formatTimestamp(ts: number): string {
+  const d = new Date(ts);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
 
 function loadHistory(): HistoryEntry[] {
   try {
@@ -39,12 +52,19 @@ function persistHistory(history: HistoryEntry[]) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
+/** Trim lines array to the maximum, keeping the most recent entries. */
+function trimLines(lines: ConsoleLine[]): ConsoleLine[] {
+  if (lines.length <= MAX_CONSOLE_LINES) return lines;
+  return lines.slice(lines.length - MAX_CONSOLE_LINES);
+}
+
 export function useRcon() {
   const lineId = useRef(2);
+  const now = Date.now();
   const [connected, setConnected] = useState(false);
   const [lines, setLines] = useState<ConsoleLine[]>([
-    { id: 0, text: "CS2 Web RCON Console v2.0.0", type: "system" },
-    { id: 1, text: "Enter server details and connect to begin.", type: "system" },
+    { id: 0, text: "CS2 Web RCON Console v2.0.0", type: "system", timestamp: now },
+    { id: 1, text: "Enter server details and connect to begin.", type: "system", timestamp: now },
   ]);
   const [serverHistory, setServerHistory] = useState<HistoryEntry[]>(loadHistory);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -58,6 +78,10 @@ export function useRcon() {
     const value = parseInt(localStorage.getItem(AUTO_REFRESH_KEY) ?? "invalid", 10);
     return isNaN(value) ? 5 : value;
   });
+  const [showTimestamps, setShowTimestamps] = useState<boolean>(() => {
+    return localStorage.getItem(SHOW_TIMESTAMPS_KEY) === "true";
+  });
+  const [logStreaming, setLogStreaming] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
@@ -67,11 +91,23 @@ export function useRcon() {
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const log = useCallback((text: string, type: LineType = "system") => {
-    setLines((prev) => [...prev, { id: lineId.current++, text, type }]);
+    setLines((prev) =>
+      trimLines([...prev, { id: lineId.current++, text, type, timestamp: Date.now() }]),
+    );
   }, []);
 
   const clearConsole = useCallback(() => {
-    setLines([{ id: lineId.current++, text: "Console cleared.", type: "system" }]);
+    setLines([
+      { id: lineId.current++, text: "Console cleared.", type: "system", timestamp: Date.now() },
+    ]);
+  }, []);
+
+  const toggleTimestamps = useCallback(() => {
+    setShowTimestamps((prev) => {
+      const next = !prev;
+      localStorage.setItem(SHOW_TIMESTAMPS_KEY, String(next));
+      return next;
+    });
   }, []);
 
   // Keep connectedRef in sync
@@ -188,6 +224,7 @@ export function useRcon() {
               break;
             case "disconnected":
               setConnected(false);
+              setLogStreaming(false);
               log("Disconnected from server.", "info");
               break;
             case "response":
@@ -213,6 +250,13 @@ export function useRcon() {
             case "player_list":
               setPlayers(msg.players);
               break;
+            case "log_event":
+              log(msg.event.message, "log");
+              break;
+            case "log_streaming":
+              setLogStreaming(msg.enabled);
+              log(msg.message, "info");
+              break;
           }
         } catch (err) {
           console.error("Failed to parse WebSocket message:", err);
@@ -222,6 +266,7 @@ export function useRcon() {
 
       ws.onclose = () => {
         setConnected(false);
+        setLogStreaming(false);
         log(`WebSocket connection lost. Reconnecting in ${reconnectDelay / 1000}s...`, "error");
         setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
@@ -306,6 +351,27 @@ export function useRcon() {
     localStorage.setItem(AUTO_REFRESH_KEY, String(seconds));
   }, []);
 
+  const toggleLogStreaming = useCallback(() => {
+    if (!connectedRef.current || !wsRef.current) {
+      log("Not connected.", "error");
+      return;
+    }
+    const type = logStreaming ? "disable_logs" : "enable_logs";
+    wsRef.current.send(JSON.stringify({ type }));
+  }, [logStreaming, log]);
+
+  // Auto-enable log streaming on connect if previously enabled
+  useEffect(() => {
+    if (connected && localStorage.getItem(LOG_STREAMING_KEY) === "true" && wsRef.current) {
+      wsRef.current.send(JSON.stringify({ type: "enable_logs" }));
+    }
+  }, [connected]);
+
+  // Persist log streaming preference
+  useEffect(() => {
+    localStorage.setItem(LOG_STREAMING_KEY, String(logStreaming));
+  }, [logStreaming]);
+
   // Auto-refresh status when connected
   useEffect(() => {
     if (connected && autoRefreshInterval > 0) {
@@ -341,6 +407,8 @@ export function useRcon() {
     fpsHistory,
     playerCountHistory,
     autoRefreshInterval,
+    showTimestamps,
+    logStreaming,
     log,
     clearConsole,
     connectToServer,
@@ -350,5 +418,7 @@ export function useRcon() {
     resetInactivity,
     requestStatus,
     updateAutoRefreshInterval,
+    toggleTimestamps,
+    toggleLogStreaming,
   };
 }
