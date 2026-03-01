@@ -41,7 +41,7 @@ export function PlayerTable({ players, maxPlayers, connected, onCommand }: Playe
 
   function handleKickConfirm() {
     if (!dialog) return;
-    const reason = kickReason.trim() || "Kicked by admin";
+    const reason = (kickReason.trim() || "Kicked by admin").replace(/"/g, "'");
     onCommand(`kickid ${dialog.player.userid} "${reason}"`);
     setDialog(null);
   }
