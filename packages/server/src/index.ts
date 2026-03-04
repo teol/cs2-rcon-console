@@ -92,6 +92,12 @@ export async function buildApp(logReceiver?: LogReceiver) {
             });
           }
 
+          // Clean up previous log listener if switching servers
+          if (logListener && logReceiver) {
+            logReceiver.removeListener("log", logListener);
+            logListener = null;
+          }
+
           // Disconnect previous connection if any
           if (rcon) {
             rcon.disconnect();

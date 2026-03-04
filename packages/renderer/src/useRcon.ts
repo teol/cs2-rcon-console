@@ -351,7 +351,9 @@ export function useRcon() {
       log("Not connected.", "error");
       return;
     }
-    const type = logStreaming ? "disable_logs" : "enable_logs";
+    const newPreference = !logStreaming;
+    localStorage.setItem(LOG_STREAMING_KEY, String(newPreference));
+    const type = newPreference ? "enable_logs" : "disable_logs";
     wsRef.current.send(JSON.stringify({ type }));
   }, [logStreaming, log]);
 
@@ -361,11 +363,6 @@ export function useRcon() {
       wsRef.current.send(JSON.stringify({ type: "enable_logs" }));
     }
   }, [connected]);
-
-  // Persist log streaming preference
-  useEffect(() => {
-    localStorage.setItem(LOG_STREAMING_KEY, String(logStreaming));
-  }, [logStreaming]);
 
   // Auto-refresh status when connected
   useEffect(() => {
