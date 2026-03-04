@@ -107,6 +107,26 @@ describe("LogReceiver", () => {
     expect(logs[0].event.message).toBe("Round started");
   });
 
+  it("strips the OOB header without null terminator (FF FF FF FF log) from UDP packets", async () => {
+    await receiver.start(9001);
+
+    const logs: LogMessage[] = [];
+    receiver.on("log", (msg: LogMessage) => logs.push(msg));
+
+    const logText = 'L 03/01/2024 - 12:34:56: World triggered "Round_End"';
+    // Build a packet with the OOB header without null: FF FF FF FF "log" (7 bytes)
+    const header = Buffer.from([0xff, 0xff, 0xff, 0xff, 0x6c, 0x6f, 0x67]);
+    const body = Buffer.from(logText, "utf8");
+    const buf = Buffer.concat([header, body]);
+    const rinfo = { address: "10.0.0.1", port: 27015, family: "IPv4", size: buf.length };
+
+    mockSocket.emit("message", buf, rinfo);
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].event.category).toBe("round");
+    expect(logs[0].event.message).toBe("Round ended");
+  });
+
   it("handles multiple log lines in a single datagram", async () => {
     await receiver.start(9001);
 

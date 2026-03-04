@@ -74,26 +74,24 @@ export class LogReceiver extends EventEmitter {
   private handleMessage(buf: Buffer, rinfo: dgram.RemoteInfo): void {
     let text: string;
 
+    const OOB_PREFIX = Buffer.from([0xff, 0xff, 0xff, 0xff]);
+
     // CS2 prefixes UDP log lines with the OOB header: FF FF FF FF
     // followed by "log" and an optional null terminator. Strip it if present.
-    if (
-      buf.length > 4 &&
-      buf[0] === 0xff &&
-      buf[1] === 0xff &&
-      buf[2] === 0xff &&
-      buf[3] === 0xff
-    ) {
-      let offset = 4; // Start after OOB prefix
-      if (buf.length > offset + 3 && buf.toString("ascii", offset, offset + 3) === "log") {
-        offset += 3; // "log" is 3 bytes
-        if (buf.length > offset && buf[offset] === 0x00) {
-          offset += 1; // Optional null terminator
-        }
+    if (buf.length > 4 && buf.subarray(0, 4).equals(OOB_PREFIX)) {
+      const LOG_HEADER_NULL = Buffer.from("log\0");
+      const LOG_HEADER = Buffer.from("log");
+      const payload = buf.subarray(4);
+
+      if (payload.indexOf(LOG_HEADER_NULL) === 0) {
+        text = payload.subarray(LOG_HEADER_NULL.length).toString("utf8");
+      } else if (payload.indexOf(LOG_HEADER) === 0) {
+        text = payload.subarray(LOG_HEADER.length).toString("utf8");
       } else {
-        // Fallback for an unknown payload: assume an 8-byte header.
-        offset = 8;
+        // Fallback for an unknown payload after OOB prefix, e.g. A2S responses.
+        // Assume a fixed-size header and try to decode the rest.
+        text = payload.subarray(Math.min(4, payload.length)).toString("utf8");
       }
-      text = buf.subarray(Math.min(offset, buf.length)).toString("utf8");
     } else {
       text = buf.toString("utf8");
     }

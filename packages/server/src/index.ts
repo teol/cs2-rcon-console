@@ -271,8 +271,9 @@ export async function buildApp(logReceiver?: LogReceiver) {
 
           // Register a log listener scoped to this client's CS2 server
           const targetHost = rconHost;
+          const targetPort = rconPort!;
           logListener = (logMsg: LogMessage) => {
-            if (logMsg.sourceIp === targetHost) {
+            if (logMsg.sourceIp === targetHost && logMsg.sourcePort === targetPort) {
               send(socket, { type: "log_event", event: logMsg.event });
             }
           };
