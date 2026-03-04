@@ -90,14 +90,23 @@ export class LogReceiver extends EventEmitter {
       } else {
         // Fallback for an unknown payload after OOB prefix, e.g. A2S responses.
         // Assume a fixed-size header and try to decode the rest.
-        text = payload.subarray(Math.min(4, payload.length)).toString("utf8");
+        const headerSize = Math.min(4, payload.length);
+        if (headerSize < 4) {
+          console.warn("Unexpectedly short payload after OOB prefix");
+          return;
+        }
+        text = payload.subarray(headerSize).toString("utf8");
       }
     } else {
       text = buf.toString("utf8");
     }
 
-    // A single datagram may contain multiple newline-separated log lines
-    const lines = text.split("\n").filter((l) => l.trim().length > 0);
+    // A single datagram may contain multiple newline-separated log lines.
+    // Limit to 100 lines per packet to prevent DoS via crafted datagrams.
+    const lines = text
+      .split("\n")
+      .slice(0, 100)
+      .filter((l) => l.trim().length > 0);
 
     for (const line of lines) {
       const event = parseLogLine(line);

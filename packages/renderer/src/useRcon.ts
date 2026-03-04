@@ -86,6 +86,7 @@ export function useRcon() {
 
   const log = useCallback((text: string, type: LineType = "system") => {
     setLines((prev) => [
+      // Drop the oldest line when at the limit to cap memory at MAX_CONSOLE_LINES
       ...prev.slice(prev.length >= MAX_CONSOLE_LINES ? 1 : 0),
       { id: lineId.current++, text, type, timestamp: Date.now() },
     ]);
@@ -349,6 +350,10 @@ export function useRcon() {
   const toggleLogStreaming = useCallback(() => {
     if (!connectedRef.current || !wsRef.current) {
       log("Not connected.", "error");
+      return;
+    }
+    if (wsRef.current.readyState !== WebSocket.OPEN) {
+      log("WebSocket connection is not open.", "error");
       return;
     }
     const newPreference = !logStreaming;

@@ -262,26 +262,26 @@ export async function buildApp(logReceiver?: LogReceiver) {
             });
           }
 
-          if (!rcon || !rcon.isConnected || !rconHost) {
+          if (!rcon || !rcon.isConnected || !rconHost || rconPort == null) {
             return send(socket, {
               type: "error",
               message: "Not connected to any server",
             });
           }
 
-          // Register a log listener scoped to this client's CS2 server
+          // Tell the CS2 server to send logs to us, then register the
+          // listener only on success to avoid a dangling listener if
+          // the RCON command fails.
           const targetHost = rconHost;
-          const targetPort = rconPort!;
-          logListener = (logMsg: LogMessage) => {
-            if (logMsg.sourceIp === targetHost && logMsg.sourcePort === targetPort) {
-              send(socket, { type: "log_event", event: logMsg.event });
-            }
-          };
-          logReceiver.on("log", logListener);
-
-          // Tell the CS2 server to send logs to us
+          const targetPort = rconPort;
           try {
             await rcon.execute(`logaddress_add "${LOG_ADDRESS}:${logReceiver.port}"`);
+            logListener = (logMsg: LogMessage) => {
+              if (logMsg.sourceIp === targetHost && logMsg.sourcePort === targetPort) {
+                send(socket, { type: "log_event", event: logMsg.event });
+              }
+            };
+            logReceiver.on("log", logListener);
             send(socket, {
               type: "log_streaming",
               enabled: true,
@@ -289,8 +289,6 @@ export async function buildApp(logReceiver?: LogReceiver) {
             });
             console.log(`[LOG] Streaming enabled for ${targetHost}`);
           } catch (err) {
-            logReceiver.removeListener("log", logListener);
-            logListener = null;
             send(socket, {
               type: "error",
               message: `Failed to enable log streaming: ${(err as Error).message}`,
@@ -308,8 +306,9 @@ export async function buildApp(logReceiver?: LogReceiver) {
           if (rcon && rcon.isConnected && logReceiver?.listening) {
             try {
               await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
-            } catch {
+            } catch (err) {
               // Best effort — the server may already be disconnected
+              console.warn("[LOG] Failed to remove logaddress:", (err as Error).message);
             }
           }
 
