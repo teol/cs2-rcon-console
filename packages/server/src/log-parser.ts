@@ -1,17 +1,20 @@
 import type { LogEvent } from "@cs2-rcon/shared";
 
 // Compiled once at module load — these are on the hot path during log streaming.
+// Character classes like [^<]+ and [^>]+ are used instead of .+? to prevent
+// catastrophic backtracking (ReDoS) on crafted input.
 const TIMESTAMP_RE = /^L\s+(\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}:\d{2}:\d{2}):\s*(.*)/;
-const KILL_GUARD_RE = /killed\s+".*?"\s+.*?with\s+"/;
-const KILL_RE = /"(.+?)<\d+><.+?><(.+?)>".*killed\s+"(.+?)<\d+><.+?><(.+?)>".*with\s+"(.+?)"/;
+const KILL_GUARD_RE = /killed\s+"[^"]*"[^"]*with\s+"/;
+const KILL_RE =
+  /"([^<]+)<\d+><[^>]+><([^>]*)>"[^"]*killed\s+"([^<]+)<\d+><[^>]+><([^>]*)>"[^"]*with\s+"([^"]+)"/;
 const HEADSHOT_RE = /\(headshot\)/;
-const CHAT_RE = /"(.+?)<\d+><.+?><(.*?)>"\s+(say_team|say)\s+"(.*)"/;
-const CONNECT_RE = /"(.+?)<(\d+)><(.+?)><.*>"\s+connected,\s+address\s+"(.+?)"/;
-const ENTER_RE = /"(.+?)<(\d+)><(.+?)><.*>"\s+entered the game/;
-const DISCONNECT_RE = /"(.+?)<(\d+)><(.+?)><.*>"\s+disconnected\s*\(reason\s+"(.+?)"\)/;
+const CHAT_RE = /"([^<]+)<\d+><[^>]+><([^>]*)>"\s+(say_team|say)\s+"(.*)"/;
+const CONNECT_RE = /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+connected,\s+address\s+"([^"]+)"/;
+const ENTER_RE = /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+entered the game/;
+const DISCONNECT_RE = /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+disconnected\s*\(reason\s+"([^"]+)"\)/;
 const ROUND_START_RE = /World triggered "Round_Start"/;
 const ROUND_END_RE = /World triggered "Round_End"/;
-const TEAM_WIN_RE = /Team "(.+?)"\s+triggered\s+"(.+?)"/;
+const TEAM_WIN_RE = /Team "([^"]+)"\s+triggered\s+"([^"]+)"/;
 
 /**
  * Parse a single CS2 log line into a structured LogEvent.

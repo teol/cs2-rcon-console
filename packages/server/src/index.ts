@@ -53,6 +53,18 @@ export function send(ws: { send: (data: string) => void }, msg: ServerMessage): 
   ws.send(JSON.stringify(msg));
 }
 
+/**
+ * Tracks how many WS clients are actively streaming logs from each
+ * game server.  The `logaddress_del` RCON command is only sent when
+ * the count for a server drops to zero, preventing one client from
+ * killing another client's log stream.
+ */
+export const logRefCounts = new Map<string, number>();
+
+function logRefKey(host: string, port: number): string {
+  return `${host}:${port}`;
+}
+
 /** Create and configure the Fastify app (without starting it). */
 export async function buildApp(logReceiver?: LogReceiver) {
   const app = Fastify({ logger: false });
@@ -70,6 +82,7 @@ export async function buildApp(logReceiver?: LogReceiver) {
     let rconHost: string | null = null;
     let rconPort: number | null = null;
     let logListener: ((msg: LogMessage) => void) | null = null;
+    let logServerKey: string | null = null;
 
     console.log("[WS] New client connected");
 
@@ -96,6 +109,15 @@ export async function buildApp(logReceiver?: LogReceiver) {
           if (logListener && logReceiver) {
             logReceiver.removeListener("log", logListener);
             logListener = null;
+          }
+          if (logServerKey) {
+            const prev = logRefCounts.get(logServerKey) ?? 0;
+            if (prev <= 1) {
+              logRefCounts.delete(logServerKey);
+            } else {
+              logRefCounts.set(logServerKey, prev - 1);
+            }
+            logServerKey = null;
           }
 
           // Disconnect previous connection if any
@@ -252,6 +274,15 @@ export async function buildApp(logReceiver?: LogReceiver) {
             logReceiver.removeListener("log", logListener);
             logListener = null;
           }
+          if (logServerKey) {
+            const prev = logRefCounts.get(logServerKey) ?? 0;
+            if (prev <= 1) {
+              logRefCounts.delete(logServerKey);
+            } else {
+              logRefCounts.set(logServerKey, prev - 1);
+            }
+            logServerKey = null;
+          }
 
           if (!logReceiver || !logReceiver.listening) {
             return send(socket, {
@@ -269,25 +300,33 @@ export async function buildApp(logReceiver?: LogReceiver) {
             });
           }
 
-          // Tell the CS2 server to send logs to us, then register the
-          // listener only on success to avoid a dangling listener if
-          // the RCON command fails.
           const targetHost = rconHost;
           const targetPort = rconPort;
+          const key = logRefKey(targetHost, targetPort);
+          const isFirstSubscriber = (logRefCounts.get(key) ?? 0) === 0;
+
           try {
-            await rcon.execute(`logaddress_add "${LOG_ADDRESS}:${logReceiver.port}"`);
+            // Only send logaddress_add when this is the first subscriber
+            // for this game server, so we don't spam redundant RCON commands.
+            if (isFirstSubscriber) {
+              await rcon.execute(`logaddress_add "${LOG_ADDRESS}:${logReceiver.port}"`);
+            }
             logListener = (logMsg: LogMessage) => {
               if (logMsg.sourceIp === targetHost && logMsg.sourcePort === targetPort) {
                 send(socket, { type: "log_event", event: logMsg.event });
               }
             };
             logReceiver.on("log", logListener);
+            logServerKey = key;
+            logRefCounts.set(key, (logRefCounts.get(key) ?? 0) + 1);
             send(socket, {
               type: "log_streaming",
               enabled: true,
               message: "Log streaming enabled",
             });
-            console.log(`[LOG] Streaming enabled for ${targetHost}`);
+            console.log(
+              `[LOG] Streaming enabled for ${targetHost} (refs: ${logRefCounts.get(key)})`,
+            );
           } catch (err) {
             send(socket, {
               type: "error",
@@ -303,13 +342,26 @@ export async function buildApp(logReceiver?: LogReceiver) {
             logListener = null;
           }
 
-          if (rcon && rcon.isConnected && logReceiver?.listening) {
-            try {
-              await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
-            } catch (err) {
-              // Best effort — the server may already be disconnected
-              console.warn("[LOG] Failed to remove logaddress:", (err as Error).message);
+          // Decrement ref count; only send logaddress_del when this
+          // was the last subscriber for this game server.
+          if (logServerKey) {
+            const prev = logRefCounts.get(logServerKey) ?? 0;
+            const isLastSubscriber = prev <= 1;
+            if (isLastSubscriber) {
+              logRefCounts.delete(logServerKey);
+            } else {
+              logRefCounts.set(logServerKey, prev - 1);
             }
+
+            if (isLastSubscriber && rcon && rcon.isConnected && logReceiver?.listening) {
+              try {
+                await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
+              } catch (err) {
+                // Best effort — the server may already be disconnected
+                console.warn("[LOG] Failed to remove logaddress:", (err as Error).message);
+              }
+            }
+            logServerKey = null;
           }
 
           send(socket, {
@@ -331,10 +383,19 @@ export async function buildApp(logReceiver?: LogReceiver) {
 
     socket.on("close", () => {
       console.log("[WS] Client disconnected");
-      // Clean up log listener
+      // Clean up log listener and decrement ref count
       if (logListener && logReceiver) {
         logReceiver.removeListener("log", logListener);
         logListener = null;
+      }
+      if (logServerKey) {
+        const prev = logRefCounts.get(logServerKey) ?? 0;
+        if (prev <= 1) {
+          logRefCounts.delete(logServerKey);
+        } else {
+          logRefCounts.set(logServerKey, prev - 1);
+        }
+        logServerKey = null;
       }
       if (rcon) {
         rcon.disconnect();

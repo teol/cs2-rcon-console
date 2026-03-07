@@ -85,11 +85,11 @@ export function useRcon() {
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const log = useCallback((text: string, type: LineType = "system") => {
-    setLines((prev) => [
-      // Drop the oldest line when at the limit to cap memory at MAX_CONSOLE_LINES
-      ...prev.slice(prev.length >= MAX_CONSOLE_LINES ? 1 : 0),
-      { id: lineId.current++, text, type, timestamp: Date.now() },
-    ]);
+    setLines((prev) => {
+      const updatedLines = [...prev, { id: lineId.current++, text, type, timestamp: Date.now() }];
+      // Cap the array at MAX_CONSOLE_LINES to prevent unbounded memory growth
+      return updatedLines.slice(-MAX_CONSOLE_LINES);
+    });
   }, []);
 
   const clearConsole = useCallback(() => {
