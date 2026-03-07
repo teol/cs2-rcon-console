@@ -262,7 +262,7 @@ export async function buildApp(logReceiver?: LogReceiver) {
             });
           }
 
-          if (!rcon || !rcon.isConnected || !rconHost || rconPort == null) {
+          if (!rcon || !rcon.isConnected || !rconHost || rconPort === null) {
             return send(socket, {
               type: "error",
               message: "Not connected to any server",

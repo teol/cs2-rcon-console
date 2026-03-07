@@ -88,14 +88,8 @@ export class LogReceiver extends EventEmitter {
       } else if (payload.indexOf(LOG_HEADER) === 0) {
         text = payload.subarray(LOG_HEADER.length).toString("utf8");
       } else {
-        // Fallback for an unknown payload after OOB prefix, e.g. A2S responses.
-        // Assume a fixed-size header and try to decode the rest.
-        const headerSize = Math.min(4, payload.length);
-        if (headerSize < 4) {
-          console.warn("Unexpectedly short payload after OOB prefix");
-          return;
-        }
-        text = payload.subarray(headerSize).toString("utf8");
+        // This is an OOB packet but not a log packet (e.g. A2S response). Ignore it.
+        return;
       }
     } else {
       text = buf.toString("utf8");

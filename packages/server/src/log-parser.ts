@@ -1,7 +1,7 @@
 import type { LogEvent } from "@cs2-rcon/shared";
 
 // Compiled once at module load — these are on the hot path during log streaming.
-const TIMESTAMP_RE = /^L\s+(\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}:\d{2}:\d{2}):\s*(.*)/s;
+const TIMESTAMP_RE = /^L\s+(\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}:\d{2}:\d{2}):\s*(.*)/;
 const KILL_GUARD_RE = /killed\s+".*?"\s+.*?with\s+"/;
 const KILL_RE = /"(.+?)<\d+><.+?><(.+?)>".*killed\s+"(.+?)<\d+><.+?><(.+?)>".*with\s+"(.+?)"/;
 const HEADSHOT_RE = /\(headshot\)/;
