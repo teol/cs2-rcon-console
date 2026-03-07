@@ -84,6 +84,23 @@ export async function buildApp(logReceiver?: LogReceiver) {
     let logListener: ((msg: LogMessage) => void) | null = null;
     let logServerKey: string | null = null;
 
+    /** Remove the current log listener and decrement the ref count. */
+    function cleanupLogListener() {
+      if (logListener && logReceiver) {
+        logReceiver.removeListener("log", logListener);
+        logListener = null;
+      }
+      if (logServerKey) {
+        const prev = logRefCounts.get(logServerKey) ?? 0;
+        if (prev <= 1) {
+          logRefCounts.delete(logServerKey);
+        } else {
+          logRefCounts.set(logServerKey, prev - 1);
+        }
+        logServerKey = null;
+      }
+    }
+
     console.log("[WS] New client connected");
 
     socket.on("message", async (raw: Buffer) => {
@@ -106,19 +123,7 @@ export async function buildApp(logReceiver?: LogReceiver) {
           }
 
           // Clean up previous log listener if switching servers
-          if (logListener && logReceiver) {
-            logReceiver.removeListener("log", logListener);
-            logListener = null;
-          }
-          if (logServerKey) {
-            const prev = logRefCounts.get(logServerKey) ?? 0;
-            if (prev <= 1) {
-              logRefCounts.delete(logServerKey);
-            } else {
-              logRefCounts.set(logServerKey, prev - 1);
-            }
-            logServerKey = null;
-          }
+          cleanupLogListener();
 
           // Disconnect previous connection if any
           if (rcon) {
@@ -270,19 +275,7 @@ export async function buildApp(logReceiver?: LogReceiver) {
         case "enable_logs": {
           // Remove any pre-existing listener for this client to prevent leaks
           // when the client calls enable_logs multiple times without disabling.
-          if (logListener && logReceiver) {
-            logReceiver.removeListener("log", logListener);
-            logListener = null;
-          }
-          if (logServerKey) {
-            const prev = logRefCounts.get(logServerKey) ?? 0;
-            if (prev <= 1) {
-              logRefCounts.delete(logServerKey);
-            } else {
-              logRefCounts.set(logServerKey, prev - 1);
-            }
-            logServerKey = null;
-          }
+          cleanupLogListener();
 
           if (!logReceiver || !logReceiver.listening) {
             return send(socket, {
@@ -337,31 +330,20 @@ export async function buildApp(logReceiver?: LogReceiver) {
         }
 
         case "disable_logs": {
-          if (logListener && logReceiver) {
-            logReceiver.removeListener("log", logListener);
-            logListener = null;
-          }
+          // Check if this is the last subscriber *before* decrementing
+          const isLastSubscriber =
+            logServerKey !== null && (logRefCounts.get(logServerKey) ?? 0) <= 1;
 
-          // Decrement ref count; only send logaddress_del when this
-          // was the last subscriber for this game server.
-          if (logServerKey) {
-            const prev = logRefCounts.get(logServerKey) ?? 0;
-            const isLastSubscriber = prev <= 1;
-            if (isLastSubscriber) {
-              logRefCounts.delete(logServerKey);
-            } else {
-              logRefCounts.set(logServerKey, prev - 1);
-            }
+          cleanupLogListener();
 
-            if (isLastSubscriber && rcon && rcon.isConnected && logReceiver?.listening) {
-              try {
-                await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
-              } catch (err) {
-                // Best effort — the server may already be disconnected
-                console.warn("[LOG] Failed to remove logaddress:", (err as Error).message);
-              }
+          // Only send logaddress_del when the last subscriber disconnects
+          if (isLastSubscriber && rcon && rcon.isConnected && logReceiver?.listening) {
+            try {
+              await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
+            } catch (err) {
+              // Best effort — the server may already be disconnected
+              console.warn("[LOG] Failed to remove logaddress:", (err as Error).message);
             }
-            logServerKey = null;
           }
 
           send(socket, {
@@ -383,20 +365,7 @@ export async function buildApp(logReceiver?: LogReceiver) {
 
     socket.on("close", () => {
       console.log("[WS] Client disconnected");
-      // Clean up log listener and decrement ref count
-      if (logListener && logReceiver) {
-        logReceiver.removeListener("log", logListener);
-        logListener = null;
-      }
-      if (logServerKey) {
-        const prev = logRefCounts.get(logServerKey) ?? 0;
-        if (prev <= 1) {
-          logRefCounts.delete(logServerKey);
-        } else {
-          logRefCounts.set(logServerKey, prev - 1);
-        }
-        logServerKey = null;
-      }
+      cleanupLogListener();
       if (rcon) {
         rcon.disconnect();
         rcon = null;

@@ -27,6 +27,10 @@ export interface LogMessage {
  * receiver.stop();
  * ```
  */
+const OOB_PREFIX = Buffer.from([0xff, 0xff, 0xff, 0xff]);
+const LOG_HEADER_NULL = Buffer.from("log\0");
+const LOG_HEADER = Buffer.from("log");
+
 export class LogReceiver extends EventEmitter {
   private socket: dgram.Socket | null = null;
   private _port = 0;
@@ -74,13 +78,9 @@ export class LogReceiver extends EventEmitter {
   private handleMessage(buf: Buffer, rinfo: dgram.RemoteInfo): void {
     let text: string;
 
-    const OOB_PREFIX = Buffer.from([0xff, 0xff, 0xff, 0xff]);
-
     // CS2 prefixes UDP log lines with the OOB header: FF FF FF FF
     // followed by "log" and an optional null terminator. Strip it if present.
     if (buf.length > 4 && buf.subarray(0, 4).equals(OOB_PREFIX)) {
-      const LOG_HEADER_NULL = Buffer.from("log\0");
-      const LOG_HEADER = Buffer.from("log");
       const payload = buf.subarray(4);
 
       if (payload.indexOf(LOG_HEADER_NULL) === 0) {
