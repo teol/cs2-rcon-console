@@ -31,6 +31,9 @@ const OOB_PREFIX = Buffer.from([0xff, 0xff, 0xff, 0xff]);
 const LOG_HEADER_NULL = Buffer.from("log\0");
 const LOG_HEADER = Buffer.from("log");
 
+/** Maximum UDP payload size we are willing to process (8 KB). */
+const MAX_PACKET_SIZE = 8192;
+
 export class LogReceiver extends EventEmitter {
   private socket: dgram.Socket | null = null;
   private _port = 0;
@@ -76,6 +79,15 @@ export class LogReceiver extends EventEmitter {
   }
 
   private handleMessage(buf: Buffer, rinfo: dgram.RemoteInfo): void {
+    // Discard oversized packets to prevent resource exhaustion.
+    // Legitimate CS2 log datagrams are well under 8 KB.
+    if (buf.length > MAX_PACKET_SIZE) {
+      console.warn(
+        `[LOG] Discarding oversized UDP packet (${buf.length} bytes) from ${rinfo.address}:${rinfo.port}`,
+      );
+      return;
+    }
+
     let text: string;
 
     // CS2 prefixes UDP log lines with the OOB header: FF FF FF FF

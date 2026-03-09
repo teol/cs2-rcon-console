@@ -163,6 +163,21 @@ describe("LogReceiver", () => {
     expect(logs).toHaveLength(1);
   });
 
+  it("discards oversized UDP packets", async () => {
+    await receiver.start(9001);
+
+    const logs: LogMessage[] = [];
+    receiver.on("log", (msg: LogMessage) => logs.push(msg));
+
+    // Create a packet larger than 8 KB
+    const buf = Buffer.alloc(9000, 0x41); // 9000 bytes of 'A'
+    const rinfo = { address: "10.0.0.1", port: 27015, family: "IPv4", size: buf.length };
+
+    mockSocket.emit("message", buf, rinfo);
+
+    expect(logs).toHaveLength(0);
+  });
+
   // ─── Error handling ───
 
   it("re-emits socket errors", async () => {
