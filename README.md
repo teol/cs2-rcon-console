@@ -31,34 +31,31 @@ Browsers cannot open raw TCP connections. The Node.js backend bridges the browse
 - **Node.js** ≥ 20
 - **Corepack** enabled (`corepack enable`) — provides Yarn 4
 
-## Setup
+## Setup (local development)
 
 ```bash
 corepack enable
 yarn install
-yarn build
-yarn workspace @cs2-rcon/server start
+yarn dev
 ```
 
-Open <http://localhost:3000>.
+This starts all packages in watch/dev mode:
 
-## Development
+- Backend (Fastify) on <http://localhost:3000>
+- Frontend (Vite HMR) on <http://localhost:5173> — proxies `/ws` to the backend
 
-Run the Vite dev server (HMR) and the Fastify backend in parallel:
+To run only one package at a time:
 
 ```bash
 # Terminal 1 — Fastify backend
 yarn workspace @cs2-rcon/server dev
 
-# Terminal 2 — Vite frontend (proxies /ws to localhost:3000)
+# Terminal 2 — Vite frontend
 yarn workspace @cs2-rcon/renderer dev
 ```
 
-Or start everything at once:
-
-```bash
-yarn dev
-```
+> **Note** — `yarn workspace @cs2-rcon/server start` runs the compiled output directly
+> and requires a prior `yarn build`. Use `yarn dev` for local development to avoid this.
 
 ## Project structure
 
