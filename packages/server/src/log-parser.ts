@@ -26,7 +26,7 @@ const PATTERNS: LogPattern[] = [
   },
   {
     category: "chat",
-    re: /"([^<]+)<\d+><[^>]+><([^>]*)>"\s+(say_team|say)\s+"(.*)"/,
+    re: /"([^<]+)<\d+><[^>]+><([^>]*)>"\s+(say_team|say)\s+"(.*)"$/,
     handler: (match) => {
       const [, player, team, chatType, message] = match;
       const prefix = chatType === "say_team" ? "[TEAM] " : "";
