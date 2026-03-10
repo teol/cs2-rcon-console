@@ -4,17 +4,79 @@ import type { LogEvent } from "@cs2-rcon/shared";
 // Character classes like [^<]+ and [^>]+ are used instead of .+? to prevent
 // catastrophic backtracking (ReDoS) on crafted input.
 const TIMESTAMP_RE = /^L\s+(\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}:\d{2}:\d{2}):\s*(.*)/;
-const KILL_GUARD_RE = /killed\s+"[^"]*"[^"]*with\s+"/;
-const KILL_RE =
-  /"([^<]+)<\d+><[^>]+><([^>]*)>"[^"]*killed\s+"([^<]+)<\d+><[^>]+><([^>]*)>"[^"]*with\s+"([^"]+)"/;
 const HEADSHOT_RE = /\(headshot\)/;
-const CHAT_RE = /"([^<]+)<\d+><[^>]+><([^>]*)>"\s+(say_team|say)\s+"(.*)"/;
-const CONNECT_RE = /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+connected,\s+address\s+"([^"]+)"/;
-const ENTER_RE = /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+entered the game/;
-const DISCONNECT_RE = /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+disconnected\s*\(reason\s+"([^"]+)"\)/;
-const ROUND_START_RE = /World triggered "Round_Start"/;
-const ROUND_END_RE = /World triggered "Round_End"/;
-const TEAM_WIN_RE = /Team "([^"]+)"\s+triggered\s+"([^"]+)"/;
+
+interface LogPattern {
+  category: LogEvent["category"];
+  guard?: RegExp;
+  re: RegExp;
+  handler: (match: RegExpMatchArray, body: string) => string;
+}
+
+const PATTERNS: LogPattern[] = [
+  {
+    category: "kill",
+    guard: /killed\s+"[^"]*"[^"]*with\s+"/,
+    re: /"([^<]+)<\d+><[^>]+><([^>]*)>"[^"]*killed\s+"([^<]+)<\d+><[^>]+><([^>]*)>"[^"]*with\s+"([^"]+)"/,
+    handler: (match, body) => {
+      const [, attacker, attackerTeam, victim, victimTeam, weapon] = match;
+      const hs = HEADSHOT_RE.test(body) ? " (headshot)" : "";
+      return `${attacker} [${attackerTeam}] killed ${victim} [${victimTeam}] with ${weapon}${hs}`;
+    },
+  },
+  {
+    category: "chat",
+    re: /"([^<]+)<\d+><[^>]+><([^>]*)>"\s+(say_team|say)\s+"(.*)"/,
+    handler: (match) => {
+      const [, player, team, chatType, message] = match;
+      const prefix = chatType === "say_team" ? "[TEAM] " : "";
+      const teamTag = team ? ` [${team}]` : "";
+      return `${prefix}${player}${teamTag}: ${message}`;
+    },
+  },
+  {
+    category: "connection",
+    re: /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+connected,\s+address\s+"([^"]+)"/,
+    handler: (match) => {
+      const [, player, , steamId, address] = match;
+      return `${player} connected (${steamId}) from ${address}`;
+    },
+  },
+  {
+    category: "connection",
+    re: /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+entered the game/,
+    handler: (match) => {
+      const [, player] = match;
+      return `${player} entered the game`;
+    },
+  },
+  {
+    category: "disconnection",
+    re: /"([^<]+)<(\d+)><([^>]+)><[^>]*>"\s+disconnected\s*\(reason\s+"([^"]+)"\)/,
+    handler: (match) => {
+      const [, player, , , reason] = match;
+      return `${player} disconnected (${reason})`;
+    },
+  },
+  {
+    category: "round",
+    re: /World triggered "Round_Start"/,
+    handler: () => "Round started",
+  },
+  {
+    category: "round",
+    re: /World triggered "Round_End"/,
+    handler: () => "Round ended",
+  },
+  {
+    category: "round",
+    re: /Team "([^"]+)"\s+triggered\s+"([^"]+)"/,
+    handler: (match) => {
+      const [, team, event] = match;
+      return `${team}: ${event}`;
+    },
+  },
+];
 
 /**
  * Parse a single CS2 log line into a structured LogEvent.
@@ -40,87 +102,19 @@ export function parseLogLine(raw: string): LogEvent {
   const timestamp = tsMatch ? tsMatch[1] : "";
   const body = tsMatch ? tsMatch[2] : trimmed;
 
-  // Kill: "Player<uid><steamid><team>" [x y z] killed "Player2<uid><steamid><team>" [x y z] with "weapon"
-  if (KILL_GUARD_RE.test(body)) {
-    const killMatch = body.match(KILL_RE);
-    if (killMatch) {
-      const [, attacker, attackerTeam, victim, victimTeam, weapon] = killMatch;
-      const hs = HEADSHOT_RE.test(body) ? " (headshot)" : "";
+  for (const pattern of PATTERNS) {
+    if (pattern.guard && !pattern.guard.test(body)) {
+      continue;
+    }
+    const match = body.match(pattern.re);
+    if (match) {
       return {
         timestamp,
-        category: "kill",
-        message: `${attacker} [${attackerTeam}] killed ${victim} [${victimTeam}] with ${weapon}${hs}`,
+        category: pattern.category,
+        message: pattern.handler(match, body),
         raw: trimmed,
       };
     }
-  }
-
-  // Chat: "Player<uid><steamid><team>" say "message"
-  // Chat: "Player<uid><steamid><team>" say_team "message"
-  const chatMatch = body.match(CHAT_RE);
-  if (chatMatch) {
-    const [, player, team, chatType, message] = chatMatch;
-    const prefix = chatType === "say_team" ? `[TEAM] ` : "";
-    const teamTag = team ? ` [${team}]` : "";
-    return {
-      timestamp,
-      category: "chat",
-      message: `${prefix}${player}${teamTag}: ${message}`,
-      raw: trimmed,
-    };
-  }
-
-  // Connection: "Player<uid><steamid><>" connected, address "ip:port"
-  const connectMatch = body.match(CONNECT_RE);
-  if (connectMatch) {
-    const [, player, , steamId, address] = connectMatch;
-    return {
-      timestamp,
-      category: "connection",
-      message: `${player} connected (${steamId}) from ${address}`,
-      raw: trimmed,
-    };
-  }
-
-  // Entered the game: "Player<uid><steamid><>" entered the game
-  const enterMatch = body.match(ENTER_RE);
-  if (enterMatch) {
-    const [, player] = enterMatch;
-    return {
-      timestamp,
-      category: "connection",
-      message: `${player} entered the game`,
-      raw: trimmed,
-    };
-  }
-
-  // Disconnection: "Player<uid><steamid><team>" disconnected (reason "Disconnect")
-  const disconnectMatch = body.match(DISCONNECT_RE);
-  if (disconnectMatch) {
-    const [, player, , , reason] = disconnectMatch;
-    return {
-      timestamp,
-      category: "disconnection",
-      message: `${player} disconnected (${reason})`,
-      raw: trimmed,
-    };
-  }
-
-  // Round start: World triggered "Round_Start"
-  if (ROUND_START_RE.test(body)) {
-    return { timestamp, category: "round", message: "Round started", raw: trimmed };
-  }
-
-  // Round end: World triggered "Round_End"
-  if (ROUND_END_RE.test(body)) {
-    return { timestamp, category: "round", message: "Round ended", raw: trimmed };
-  }
-
-  // Team win: Team "CT" triggered "SFUI_Notice_CTs_Win" / Team "TERRORIST" triggered ...
-  const teamWinMatch = body.match(TEAM_WIN_RE);
-  if (teamWinMatch) {
-    const [, team, event] = teamWinMatch;
-    return { timestamp, category: "round", message: `${team}: ${event}`, raw: trimmed };
   }
 
   // Fallback: any other log line

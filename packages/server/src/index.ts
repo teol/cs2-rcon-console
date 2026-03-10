@@ -14,7 +14,19 @@ import type { LogEvent } from "@cs2-rcon/shared";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const LOG_PORT = process.env.LOG_PORT ? Number(process.env.LOG_PORT) : 0;
-const LOG_ADDRESS = process.env.LOG_ADDRESS || "";
+
+/** Only allow valid IP addresses or hostnames to prevent RCON command injection. */
+const VALID_ADDRESS_RE = /^[a-zA-Z0-9._-]+$/;
+const LOG_ADDRESS = (() => {
+  const raw = process.env.LOG_ADDRESS || "";
+  if (raw && !VALID_ADDRESS_RE.test(raw)) {
+    console.error(
+      `[LOG] Invalid LOG_ADDRESS "${raw}" — must be a valid IP or hostname. Log streaming disabled.`,
+    );
+    return "";
+  }
+  return raw;
+})();
 
 const SERVER_TYPE_MAP: Record<string, string> = {
   d: "dedicated",
@@ -84,18 +96,27 @@ export async function buildApp(logReceiver?: LogReceiver) {
     let logListener: ((msg: LogMessage) => void) | null = null;
     let logServerKey: string | null = null;
 
-    /** Remove the current log listener and decrement the ref count. */
+    /** Remove the current log listener and decrement the ref count.
+     *  When the last subscriber for a server is removed, sends
+     *  `logaddress_del` to stop the game server from sending logs. */
     function cleanupLogListener() {
       if (logListener && logReceiver) {
         logReceiver.removeListener("log", logListener);
         logListener = null;
       }
       if (logServerKey) {
-        const prev = logRefCounts.get(logServerKey) ?? 0;
-        if (prev <= 1) {
-          logRefCounts.delete(logServerKey);
+        const key = logServerKey;
+        const prevCount = logRefCounts.get(key) ?? 0;
+        if (prevCount <= 1) {
+          logRefCounts.delete(key);
+          // Last subscriber — tell the game server to stop sending logs
+          if (rcon && rcon.isConnected && logReceiver?.listening) {
+            rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`).catch((err) => {
+              console.warn(`[LOG] Failed to remove logaddress for ${key}:`, (err as Error).message);
+            });
+          }
         } else {
-          logRefCounts.set(logServerKey, prev - 1);
+          logRefCounts.set(key, prevCount - 1);
         }
         logServerKey = null;
       }
@@ -330,22 +351,7 @@ export async function buildApp(logReceiver?: LogReceiver) {
         }
 
         case "disable_logs": {
-          // Check if this is the last subscriber *before* decrementing
-          const isLastSubscriber =
-            logServerKey !== null && (logRefCounts.get(logServerKey) ?? 0) <= 1;
-
           cleanupLogListener();
-
-          // Only send logaddress_del when the last subscriber disconnects
-          if (isLastSubscriber && rcon && rcon.isConnected && logReceiver?.listening) {
-            try {
-              await rcon.execute(`logaddress_del "${LOG_ADDRESS}:${logReceiver.port}"`);
-            } catch (err) {
-              // Best effort — the server may already be disconnected
-              console.warn("[LOG] Failed to remove logaddress:", (err as Error).message);
-            }
-          }
-
           send(socket, {
             type: "log_streaming",
             enabled: false,
