@@ -40,6 +40,7 @@ yarn dev
 ```
 
 This starts all packages in watch/dev mode:
+
 - Backend (Fastify) on <http://localhost:3000>
 - Frontend (Vite HMR) on <http://localhost:5173> — proxies `/ws` to the backend
 
