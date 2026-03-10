@@ -16,7 +16,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const LOG_PORT = process.env.LOG_PORT ? Number(process.env.LOG_PORT) : 0;
 
 /** Only allow valid IP addresses or hostnames to prevent RCON command injection. */
-const VALID_ADDRESS_RE = /^[a-zA-Z0-9._-]+$/;
+const VALID_ADDRESS_RE = /^[a-zA-Z0-9]+([-.][a-zA-Z0-9]+)*$/;
 const LOG_ADDRESS = (() => {
   const raw = process.env.LOG_ADDRESS || "";
   if (raw && !VALID_ADDRESS_RE.test(raw)) {
