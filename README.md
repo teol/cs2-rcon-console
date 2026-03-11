@@ -6,7 +6,7 @@ Web-based RCON console for Counter-Strike 2 servers, inspired by [rcon.srcds.pro
 
 ```
 ┌─────────────┐     WebSocket     ┌──────────────┐     TCP (RCON)     ┌─────────────┐
-│   Browser    │ ◄──────────────► │   Node.js    │ ◄───────────────► │  CS2 Server │
+│   Browser    │ ◄──────────────► │     Bun      │ ◄───────────────► │  CS2 Server │
 │  (React)     │                  │  (Fastify)   │                    │    :27015   │
 └─────────────┘                   └──────────────┘                    └─────────────┘
 ```
@@ -15,7 +15,7 @@ Web-based RCON console for Counter-Strike 2 servers, inspired by [rcon.srcds.pro
 - **Backend** — Fastify + `@fastify/websocket` acting as a TCP proxy
 - **RCON** — Pure TypeScript implementation of the [Source RCON protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol)
 
-Browsers cannot open raw TCP connections. The Node.js backend bridges the browser's WebSocket to the game server's TCP RCON port.
+Browsers cannot open raw TCP connections. The Bun backend bridges the browser's WebSocket to the game server's TCP RCON port.
 
 ## Features
 
@@ -28,15 +28,13 @@ Browsers cannot open raw TCP connections. The Node.js backend bridges the browse
 
 ## Prerequisites
 
-- **Node.js** ≥ 20
-- **Corepack** enabled (`corepack enable`) — provides Yarn 4
+- **Bun** — [install from bun.sh](https://bun.sh)
 
 ## Setup (local development)
 
 ```bash
-corepack enable
-yarn install
-yarn dev
+bun install
+bun run dev
 ```
 
 This starts all packages in watch/dev mode:
@@ -48,14 +46,14 @@ To run only one package at a time:
 
 ```bash
 # Terminal 1 — Fastify backend
-yarn workspace @cs2-rcon/server dev
+bun run --filter @cs2-rcon/server dev
 
 # Terminal 2 — Vite frontend
-yarn workspace @cs2-rcon/renderer dev
+bun run --filter @cs2-rcon/renderer dev
 ```
 
-> **Note** — `yarn workspace @cs2-rcon/server start` runs the compiled output directly
-> and requires a prior `yarn build`. Use `yarn dev` for local development to avoid this.
+> **Note** — `bun run --filter @cs2-rcon/server start` runs the compiled output directly
+> and requires a prior `bun run build`. Use `bun run dev` for local development to avoid this.
 
 ## Project structure
 
@@ -65,10 +63,9 @@ cs2-rcon-console/
 │   ├── rcon/            # @cs2-rcon/rcon  — RCON protocol client library
 │   ├── renderer/        # @cs2-rcon/renderer — Vite + React frontend
 │   └── server/          # @cs2-rcon/server — Fastify WebSocket server
-├── package.json         # Yarn workspaces root
+├── package.json         # Bun workspaces root
 ├── tsconfig.base.json   # Shared TypeScript config
-├── .yarnrc.yml          # Yarn 4 (nodeLinker: node-modules)
-└── .yarn/releases/      # Yarn 4 binary (committed)
+└── bun.lock             # Bun lockfile
 ```
 
 ## Configuration
@@ -82,9 +79,8 @@ cs2-rcon-console/
 ### 1. Build the application
 
 ```bash
-corepack enable
-yarn install
-yarn build
+bun install
+bun run build
 ```
 
 ### 2. Run with a process manager
@@ -93,7 +89,7 @@ Use **systemd** or **pm2** to keep the server running:
 
 ```bash
 # With pm2
-pm2 start packages/server/dist/index.js --name cs2-rcon
+pm2 start packages/server/dist/index.js --interpreter bun --name cs2-rcon
 
 # Or with systemd (create /etc/systemd/system/cs2-rcon.service)
 ```
@@ -109,7 +105,7 @@ After=network.target
 Type=simple
 User=cs2rcon
 WorkingDirectory=/opt/cs2-rcon-console
-ExecStart=/usr/bin/node packages/server/dist/index.js
+ExecStart=/usr/local/bin/bun run packages/server/dist/index.js
 Restart=on-failure
 Environment=PORT=3000
 

@@ -12,25 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: yarn install --immutable
+        run: bun install --frozen-lockfile
 
       - name: Typecheck
-        run: yarn typecheck
+        run: bun run typecheck
 
       - name: Run tests
-        run: yarn test
+        run: bun run test
 
       - name: Build
-        run: yarn build
+        run: bun run build
 
       - name: Check formatting
-        run: yarn format:check
+        run: bun run format:check
