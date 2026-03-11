@@ -36,15 +36,20 @@ Browsers cannot open raw TCP connections. The Node.js backend bridges the browse
 ```bash
 corepack enable
 yarn install
-yarn dev
+# Start web version
+yarn dev:web
+# OR start Electron version
+yarn dev:electron
 ```
 
-This starts all packages in watch/dev mode:
+The web version starts the packages in watch/dev mode:
 
 - Backend (Fastify) on <http://localhost:3000>
 - Frontend (Vite HMR) on <http://localhost:5173> — proxies `/ws` to the backend
 
-To run only one package at a time:
+The Electron version starts an autonomous desktop app that runs its own backend instance and displays the same React frontend.
+
+To run only one package at a time (Web version):
 
 ```bash
 # Terminal 1 — Fastify backend
@@ -62,6 +67,7 @@ yarn workspace @cs2-rcon/renderer dev
 ```
 cs2-rcon-console/
 ├── packages/
+│   ├── app/             # @cs2-rcon/app — Electron application
 │   ├── rcon/            # @cs2-rcon/rcon  — RCON protocol client library
 │   ├── renderer/        # @cs2-rcon/renderer — Vite + React frontend
 │   └── server/          # @cs2-rcon/server — Fastify WebSocket server
