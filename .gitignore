@@ -2,11 +2,6 @@ node_modules/
 dist/
 dist-types/
 
-# Yarn
-.yarn/*
-!.yarn/releases
-!.yarn/patches
-.pnp.*
 
 # Environment
 .env
