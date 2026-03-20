@@ -16,13 +16,36 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const LOG_PORT = process.env.LOG_PORT ? Number(process.env.LOG_PORT) : 0;
 
-/** Only allow valid IP addresses or hostnames to prevent RCON command injection. */
-const VALID_ADDRESS_RE = /^[a-zA-Z0-9]+([-.][a-zA-Z0-9]+)*$/;
+/**
+ * Strict IPv4: each octet validated to 0-255.
+ * Prevents RCON injection and rejects malformed addresses like 999.0.0.1.
+ */
+const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}$/;
+
+/**
+ * RFC-1123 hostname: each dot-separated label starts and ends with an
+ * alphanumeric character and may contain hyphens internally.
+ * Rejects leading/trailing hyphens, consecutive dots, and empty labels.
+ */
+const HOSTNAME_RE =
+  /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+
+/**
+ * Bracketed IPv6: e.g. [::1] or [2001:db8::1].
+ * Brackets are required so the address can be embedded as "[addr]:port"
+ * in RCON commands without ambiguity.
+ */
+const IPV6_BRACKETED_RE = /^\[([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\]$/;
+
+function isValidLogAddress(addr: string): boolean {
+  return IPV4_RE.test(addr) || HOSTNAME_RE.test(addr) || IPV6_BRACKETED_RE.test(addr);
+}
+
 const LOG_ADDRESS = (() => {
   const raw = process.env.LOG_ADDRESS || "";
-  if (raw && !VALID_ADDRESS_RE.test(raw)) {
+  if (raw && !isValidLogAddress(raw)) {
     console.error(
-      `[LOG] Invalid LOG_ADDRESS "${raw}" — must be a valid IP or hostname. Log streaming disabled.`,
+      `[LOG] Invalid LOG_ADDRESS "${raw}" — must be a valid IPv4, hostname, or bracketed IPv6 (e.g. [::1]). Log streaming disabled.`,
     );
     return "";
   }
@@ -367,7 +390,10 @@ export async function buildApp(logReceiver?: LogReceiver) {
               await rcon.execute(`logaddress_add "${LOG_ADDRESS}:${logReceiver.port}"`);
             }
             logListener = (logMsg: LogMessage) => {
-              if (allowedIps.has(normalizeIp(logMsg.sourceIp)) && logMsg.sourcePort === targetPort) {
+              if (
+                allowedIps.has(normalizeIp(logMsg.sourceIp)) &&
+                logMsg.sourcePort === targetPort
+              ) {
                 send(socket, { type: "log_event", event: logMsg.event });
               }
             };
