@@ -1,21 +1,22 @@
-# CS2 Web RCON Console
+# CS2 Web & Desktop RCON Console
 
-Web-based RCON console for Counter-Strike 2 servers, inspired by [rcon.srcds.pro](https://rcon.srcds.pro/).
+Web and Desktop RCON console for Counter-Strike 2 servers, inspired by [rcon.srcds.pro](https://rcon.srcds.pro/).
 
 ## Architecture
+
+The project can be run either as a **Web Application** or as a standalone **Electron Desktop Application**. Both use the same UI and backend logic.
 
 ```
 ┌─────────────┐     WebSocket     ┌──────────────┐     TCP (RCON)     ┌─────────────┐
 │   Browser    │ ◄──────────────► │   Node.js    │ ◄───────────────► │  CS2 Server │
-│  (React)     │                  │  (Fastify)   │                    │    :27015   │
+│  / Electron  │                  │  (Fastify)   │                    │    :27015   │
 └─────────────┘                   └──────────────┘                    └─────────────┘
 ```
 
 - **Frontend** — Vite + React 19 SPA with interactive console, quick commands, server history
 - **Backend** — Fastify + `@fastify/websocket` acting as a TCP proxy
+- **Electron** — Desktop wrapper that bundles both the frontend and backend logic
 - **RCON** — Pure TypeScript implementation of the [Source RCON protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol)
-
-Browsers cannot open raw TCP connections. The Node.js backend bridges the browser's WebSocket to the game server's TCP RCON port.
 
 ## Features
 
@@ -25,46 +26,49 @@ Browsers cannot open raw TCP connections. The Node.js backend bridges the browse
 - Server history persisted in localStorage
 - Responsive UI
 - Automatic WebSocket reconnection
+- **NEW**: Standalone Desktop app with Electron
 
 ## Prerequisites
 
 - **Node.js** ≥ 20
 - **Corepack** enabled (`corepack enable`) — provides Yarn 4
 
-## Setup (local development)
+## Setup & Running
+
+### 1. Install dependencies
 
 ```bash
 corepack enable
 yarn install
-yarn dev
 ```
 
-This starts all packages in watch/dev mode:
+### 2. Choose your platform
 
-- Backend (Fastify) on <http://localhost:3000>
-- Frontend (Vite HMR) on <http://localhost:5173> — proxies `/ws` to the backend
-
-To run only one package at a time:
+#### Option A: Web Application (Development)
 
 ```bash
-# Terminal 1 — Fastify backend
-yarn workspace @cs2-rcon/server dev
-
-# Terminal 2 — Vite frontend
-yarn workspace @cs2-rcon/renderer dev
+yarn dev:web
 ```
 
-> **Note** — `yarn workspace @cs2-rcon/server start` runs the compiled output directly
-> and requires a prior `yarn build`. Use `yarn dev` for local development to avoid this.
+This starts the backend (Fastify) on <http://localhost:3000> and the frontend (Vite) on <http://localhost:5173>. The frontend automatically proxies `/ws` to the backend.
+
+#### Option B: Electron Desktop App
+
+```bash
+yarn dev:electron
+```
+
+This builds the project and launches the Electron application. The app starts its own internal backend on a dynamic port and loads the UI automatically.
 
 ## Project structure
 
 ```
 cs2-rcon-console/
 ├── packages/
-│   ├── rcon/            # @cs2-rcon/rcon  — RCON protocol client library
+│   ├── electron/        # @cs2-rcon/electron — Electron desktop wrapper
+│   ├── rcon/            # @cs2-rcon/rcon     — RCON protocol client library
 │   ├── renderer/        # @cs2-rcon/renderer — Vite + React frontend
-│   └── server/          # @cs2-rcon/server — Fastify WebSocket server
+│   └── server/          # @cs2-rcon/server   — Fastify WebSocket server
 ├── package.json         # Yarn workspaces root
 ├── tsconfig.base.json   # Shared TypeScript config
 ├── .yarnrc.yml          # Yarn 4 (nodeLinker: node-modules)

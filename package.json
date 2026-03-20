@@ -8,6 +8,8 @@
   "scripts": {
     "build": "yarn workspaces foreach -At run build",
     "dev": "yarn workspaces foreach -Api run dev",
+    "dev:web": "yarn workspaces foreach -Api --include \"@cs2-rcon/server\" --include \"@cs2-rcon/renderer\" run dev",
+    "dev:electron": "yarn build && yarn workspace @cs2-rcon/electron run dev",
     "typecheck": "yarn workspaces foreach -At run typecheck",
     "test": "yarn workspaces foreach -At run test",
     "format": "prettier --write .",
