@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { send, type ServerMessage } from "./index.js";
+import { send, normalizeIp, resolveHostIps, type ServerMessage } from "./index.js";
 
 // ---------------------------------------------------------------------------
 // send() helper
@@ -77,5 +77,46 @@ describe("send", () => {
     expect(parsed.type).toBe("log_streaming");
     expect(parsed.enabled).toBe(true);
     expect(parsed.message).toBe("Log streaming enabled");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeIp()
+// ---------------------------------------------------------------------------
+
+describe("normalizeIp", () => {
+  it("strips IPv4-mapped IPv6 prefix", () => {
+    expect(normalizeIp("::ffff:192.168.1.1")).toBe("192.168.1.1");
+  });
+
+  it("returns plain IPv4 addresses unchanged", () => {
+    expect(normalizeIp("10.0.0.1")).toBe("10.0.0.1");
+  });
+
+  it("returns plain IPv6 addresses unchanged", () => {
+    expect(normalizeIp("::1")).toBe("::1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveHostIps()
+// ---------------------------------------------------------------------------
+
+describe("resolveHostIps", () => {
+  it("includes the raw host value (normalized)", async () => {
+    const ips = await resolveHostIps("::ffff:10.0.0.1");
+    expect(ips.has("10.0.0.1")).toBe(true);
+  });
+
+  it("resolves localhost to 127.0.0.1", async () => {
+    const ips = await resolveHostIps("localhost");
+    // Should contain both "localhost" and its resolved IP
+    expect(ips.has("localhost")).toBe(true);
+    expect(ips.size).toBeGreaterThanOrEqual(1);
+  });
+
+  it("includes the raw IP when already an IP address", async () => {
+    const ips = await resolveHostIps("192.168.1.50");
+    expect(ips.has("192.168.1.50")).toBe(true);
   });
 });

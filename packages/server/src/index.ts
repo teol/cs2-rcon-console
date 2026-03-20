@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import dns from "node:dns/promises";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyWebSocket from "@fastify/websocket";
@@ -27,6 +28,38 @@ const LOG_ADDRESS = (() => {
   }
   return raw;
 })();
+
+const IPV4_MAPPED_PREFIX = "::ffff:";
+
+/**
+ * Strip the IPv4-mapped IPv6 prefix so that `::ffff:192.168.1.1` and
+ * `192.168.1.1` compare as equal.
+ */
+export function normalizeIp(ip: string): string {
+  if (ip.startsWith(IPV4_MAPPED_PREFIX)) {
+    return ip.slice(IPV4_MAPPED_PREFIX.length);
+  }
+  return ip;
+}
+
+/**
+ * Resolve a hostname to its IP addresses so log source matching works
+ * regardless of whether the user connected via hostname or IP.
+ * Returns a Set of normalized IP strings.
+ */
+export async function resolveHostIps(host: string): Promise<Set<string>> {
+  const ips = new Set<string>();
+  // If the host already looks like an IP address, use it directly
+  ips.add(normalizeIp(host));
+  try {
+    // dns.lookup returns the OS-resolved address (respects /etc/hosts)
+    const { address } = await dns.lookup(host);
+    ips.add(normalizeIp(address));
+  } catch {
+    // Resolution failed — the raw host value is still in the set
+  }
+  return ips;
+}
 
 const SERVER_TYPE_MAP: Record<string, string> = {
   d: "dedicated",
@@ -320,13 +353,21 @@ export async function buildApp(logReceiver?: LogReceiver) {
           const isFirstSubscriber = (logRefCounts.get(key) ?? 0) === 0;
 
           try {
+            // Resolve hostname → IP(s) upfront so the log listener can match
+            // incoming UDP packets regardless of whether the user connected
+            // via hostname, raw IP, or IPv4-mapped IPv6 address.
+            // NOTE: UDP source addresses can be spoofed. This IP-based check
+            // is not a security boundary — it only routes logs to the correct
+            // client. Do not rely on it for authentication.
+            const allowedIps = await resolveHostIps(targetHost);
+
             // Only send logaddress_add when this is the first subscriber
             // for this game server, so we don't spam redundant RCON commands.
             if (isFirstSubscriber) {
               await rcon.execute(`logaddress_add "${LOG_ADDRESS}:${logReceiver.port}"`);
             }
             logListener = (logMsg: LogMessage) => {
-              if (logMsg.sourceIp === targetHost && logMsg.sourcePort === targetPort) {
+              if (allowedIps.has(normalizeIp(logMsg.sourceIp)) && logMsg.sourcePort === targetPort) {
                 send(socket, { type: "log_event", event: logMsg.event });
               }
             };
