@@ -47,11 +47,11 @@ export function send(ws: { send: (data: string) => void }, msg: ServerMessage): 
 }
 
 /** Create and configure the Fastify app (without starting it). */
-export async function buildApp() {
+export async function buildApp(options: { rendererDist?: string } = {}) {
   const app = Fastify({ logger: false });
 
   // Serve the Vite-built renderer output
-  const rendererDist = path.resolve(__dirname, "..", "..", "renderer", "dist");
+  const rendererDist = options.rendererDist || path.resolve(__dirname, "..", "..", "renderer", "dist");
   await app.register(fastifyStatic, {
     root: rendererDist,
   });
