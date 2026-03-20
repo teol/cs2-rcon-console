@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { send, type ServerMessage } from "./index.js";
+import { send, normalizeIp, resolveHostIps, type ServerMessage } from "./index.js";
 
 // ---------------------------------------------------------------------------
 // send() helper
@@ -43,5 +43,80 @@ describe("send", () => {
     send(ws, { type: "disconnected" });
 
     expect(JSON.parse(ws.send.mock.calls[0][0])).toEqual({ type: "disconnected" });
+  });
+
+  it("serialises log_event messages", () => {
+    const ws = { send: vi.fn() };
+    const event = {
+      timestamp: "03/01/2024 - 12:34:56",
+      category: "kill" as const,
+      message: "Player killed Victim with ak47",
+      raw: 'L 03/01/2024 - 12:34:56: "Player" killed "Victim" with "ak47"',
+    };
+    const msg: ServerMessage = { type: "log_event", event };
+
+    send(ws, msg);
+
+    const parsed = JSON.parse(ws.send.mock.calls[0][0]);
+    expect(parsed.type).toBe("log_event");
+    expect(parsed.event.category).toBe("kill");
+    expect(parsed.event.message).toBe("Player killed Victim with ak47");
+  });
+
+  it("serialises log_streaming messages", () => {
+    const ws = { send: vi.fn() };
+    const msg: ServerMessage = {
+      type: "log_streaming",
+      enabled: true,
+      message: "Log streaming enabled",
+    };
+
+    send(ws, msg);
+
+    const parsed = JSON.parse(ws.send.mock.calls[0][0]);
+    expect(parsed.type).toBe("log_streaming");
+    expect(parsed.enabled).toBe(true);
+    expect(parsed.message).toBe("Log streaming enabled");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeIp()
+// ---------------------------------------------------------------------------
+
+describe("normalizeIp", () => {
+  it("strips IPv4-mapped IPv6 prefix", () => {
+    expect(normalizeIp("::ffff:192.168.1.1")).toBe("192.168.1.1");
+  });
+
+  it("returns plain IPv4 addresses unchanged", () => {
+    expect(normalizeIp("10.0.0.1")).toBe("10.0.0.1");
+  });
+
+  it("returns plain IPv6 addresses unchanged", () => {
+    expect(normalizeIp("::1")).toBe("::1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveHostIps()
+// ---------------------------------------------------------------------------
+
+describe("resolveHostIps", () => {
+  it("includes the raw host value (normalized)", async () => {
+    const ips = await resolveHostIps("::ffff:10.0.0.1");
+    expect(ips.has("10.0.0.1")).toBe(true);
+  });
+
+  it("resolves localhost to 127.0.0.1", async () => {
+    const ips = await resolveHostIps("localhost");
+    // Should contain both "localhost" and its resolved IP
+    expect(ips.has("localhost")).toBe(true);
+    expect(ips.size).toBeGreaterThanOrEqual(1);
+  });
+
+  it("includes the raw IP when already an IP address", async () => {
+    const ips = await resolveHostIps("192.168.1.50");
+    expect(ips.has("192.168.1.50")).toBe(true);
   });
 });

@@ -1,15 +1,30 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import type { ConsoleLine } from "../useRcon.ts";
+import { formatTimestamp } from "../useRcon.ts";
 
 interface ConsoleProps {
   lines: ConsoleLine[];
   connected: boolean;
   commandHistory: string[];
+  showTimestamps: boolean;
+  logStreaming: boolean;
   onCommand: (cmd: string) => void;
   onClear: () => void;
+  onToggleTimestamps: () => void;
+  onToggleLogStreaming: () => void;
 }
 
-export function Console({ lines, connected, commandHistory, onCommand, onClear }: ConsoleProps) {
+export function Console({
+  lines,
+  connected,
+  commandHistory,
+  showTimestamps,
+  logStreaming,
+  onCommand,
+  onClear,
+  onToggleTimestamps,
+  onToggleLogStreaming,
+}: ConsoleProps) {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState("");
@@ -65,14 +80,34 @@ export function Console({ lines, connected, commandHistory, onCommand, onClear }
     <div className="console-area">
       <div className="console-toolbar">
         <div className="console-title">{"\u25B8"} Console Output</div>
-        <button className="btn btn-clear" onClick={onClear}>
-          Clear
-        </button>
+        <div className="console-toolbar-actions">
+          <button
+            className={`btn btn-toolbar${logStreaming ? " active" : ""}`}
+            onClick={onToggleLogStreaming}
+            disabled={!connected}
+            title={logStreaming ? "Disable live log streaming" : "Enable live log streaming"}
+          >
+            {logStreaming ? "\u25C9 Live" : "\u25CB Live"}
+          </button>
+          <button
+            className={`btn btn-toolbar${showTimestamps ? " active" : ""}`}
+            onClick={onToggleTimestamps}
+            title={showTimestamps ? "Hide timestamps" : "Show timestamps"}
+          >
+            {"\u23F0"} Time
+          </button>
+          <button className="btn btn-clear" onClick={onClear}>
+            Clear
+          </button>
+        </div>
       </div>
 
       <div className="console-output" ref={outputRef}>
         {lines.map((line) => (
           <div key={line.id} className={`console-line ${line.type}`}>
+            {showTimestamps && (
+              <span className="console-timestamp">{formatTimestamp(line.timestamp)}</span>
+            )}
             {line.text}
           </div>
         ))}

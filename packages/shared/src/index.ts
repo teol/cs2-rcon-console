@@ -22,3 +22,11 @@ export interface PlayerInfo {
   loss: number;
   state: string;
 }
+
+/** A parsed game log event received via UDP log streaming. */
+export interface LogEvent {
+  timestamp: string;
+  category: "kill" | "chat" | "connection" | "disconnection" | "round" | "other";
+  message: string;
+  raw: string;
+}
