@@ -1,0 +1,21 @@
+{
+  "name": "@cs2-rcon/app",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"tsc -w\" \"wait-on dist/main.js && cross-env NODE_ENV=development electron .\"",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@cs2-rcon/server": "workspace:*"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^30.0.0",
+    "typescript": "^5.4.5",
+    "wait-on": "^9.0.4"
+  }
+}
